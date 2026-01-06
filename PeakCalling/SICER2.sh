@@ -21,7 +21,7 @@ CELLTYPES=("B" "CD4T" "CD8T" "DC" "Mono" "NK" "otherT" "other")
 #------------------------------------------
 THREADS=32
 BASE_DIR="/home/wahid/project_scHMTF/GSE195725_processed_data/splitbam_realbam"
-OUT_BASE="${BASE_DIR}/HumanPBMC_peakbed/SICER2_peakbed"
+OUT_BASE="${BASE_DIR}/HumanPBMC_peakbed/SICER2_peakbed_corrected"
 mkdir -p "${OUT_BASE}"
 
 # Human genome parameters
@@ -35,17 +35,17 @@ run_sicer2_all_input() {
     local MARK="$1"
     local MODE="$2"  # broad or narrow
 
-    local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams/sorted_bam"
-    local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/With_input2"
+    local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams_corrected/"
+    local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/With_input_corrected"
     mkdir -p "$OUT_DIR"
 
     # Adjust window and gap for broad vs narrow
     if [[ "$MODE" == "broad" ]]; then
-        WINDOW=200
-        GAP=600
-    else
         WINDOW=100
         GAP=200
+    else
+        WINDOW=50
+        GAP=100
     fi
 
     for CELL in "${CELLTYPES[@]}"; do
@@ -55,18 +55,18 @@ run_sicer2_all_input() {
 
         # Check BAM files
         if [[ ! -f "${MARK_DIR}/${MARK}_${CELL}.bam" ]]; then
-            echo "Treatment BAM missing: ${MARK}_${CELL}_sorted.bam. Skipping..."
+            echo "Treatment BAM missing: ${MARK}_${CELL}.bam. Skipping..."
             continue
         fi
-        if [[ ! -f "${MARK_DIR}/input_${CELL}_sorted.bam" ]]; then
-            echo "Control BAM missing: input_${CELL}_sorted.bam. Skipping..."
+        if [[ ! -f "${MARK_DIR}/input_${CELL}.bam" ]]; then
+            echo "Control BAM missing: input_${CELL}.bam. Skipping..."
             continue
         fi
 
         # Run SICER2
         sicer \
-          --treatment_file "${MARK_DIR}/${MARK}_${CELL}_sorted.bam" \
-          --control_file "${MARK_DIR}/input_${CELL}_sorted.bam" \
+          --treatment_file "${MARK_DIR}/${MARK}_${CELL}.bam" \
+          --control_file "${MARK_DIR}/input_${CELL}.bam" \
           --species "$GENOME" \
           --fragment_size 150 \
           --window_size $WINDOW \
@@ -111,9 +111,6 @@ for MARK in "${NARROW_MARKS[@]}"; do
     run_sicer2_all_input "$MARK" "narrow"
 done
 
-
-
-
 #!/bin/bash
 ###############################################################################################################
 ### SICER2 Peak Calling WITHOUT Control (No Input BAMs)
@@ -137,7 +134,7 @@ CELLTYPES=("B" "CD4T" "CD8T" "DC" "Mono" "NK" "otherT" "other")
 #------------------------------------------
 THREADS=32
 BASE_DIR="/home/wahid/project_scHMTF/GSE195725_processed_data/splitbam_realbam/"
-OUT_BASE="${BASE_DIR}/HumanPBMC_peakbed/SICER2_peakbed"
+OUT_BASE="${BASE_DIR}/HumanPBMC_peakbed/SICER2_peakbed_corrected"
 mkdir -p "${OUT_BASE}"
 
 GENOME="hg38"
@@ -150,15 +147,15 @@ run_sicer2_no_input() {
   local MARK="$1"
   local MODE="$2"  # broad or narrow
 
-  local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams/sorted_bam"
-  local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/Without_input2"
+  local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams_corrected"
+  local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/Without_input_corrected"
   mkdir -p "$OUT_DIR"
 
   # Adjust window and gap for broad vs narrow
   if [[ "$MODE" == "broad" ]]; then
-    WINDOW=200; GAP=600
-  else
     WINDOW=100; GAP=200
+  else
+    WINDOW=50; GAP=100
   fi
 
   for CELL in "${CELLTYPES[@]}"; do
@@ -167,7 +164,7 @@ run_sicer2_no_input() {
     CELL_OUT="${OUT_DIR}/${MARK}_${CELL}"
     mkdir -p "$CELL_OUT"
 
-    BAM="${MARK_DIR}/${MARK}_${CELL}_sorted.bam"
+    BAM="${MARK_DIR}/${MARK}_${CELL}.bam"
     if [[ ! -f "$BAM" ]]; then
       echo "Missing BAM file: $BAM"
       continue
@@ -228,7 +225,7 @@ done
 
 #!/bin/bash
 ###############################################################################################################
-### SICER2 Peak Calling WITH Control (Input BAMs)
+### SICER2 Peak Calling WITH Control (with Input BAMs)
 ### Multi-histone processing: Broad + Narrow marks
 ### MouseBrain real BAMs
 ###############################################################################################################
@@ -274,16 +271,16 @@ run_sicer2_all_input() {
     local MODE="$2"  # broad or narrow
 
     local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams"
-    local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/With_input"
+    local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/With_input_corrected"
     mkdir -p "$OUT_DIR"
 
     # Adjust window and gap for broad vs narrow
     if [[ "$MODE" == "broad" ]]; then
-        WINDOW=200
-        GAP=600
-    else
         WINDOW=100
         GAP=200
+    else
+        WINDOW=50
+        GAP=100
     fi
 
     for CELL in "${CELLTYPES[@]}"; do
@@ -355,6 +352,7 @@ for MARK in "${NARROW_MARKS[@]}"; do
 done
 
 
+
 #!/bin/bash
 ###############################################################################################################
 ### SICER2 Peak Calling WITHOUT Control (No Input BAMs)
@@ -401,14 +399,14 @@ run_sicer2_no_input() {
   local MODE="$2"  # broad or narrow
 
   local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams"
-  local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/Without_input"
+  local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/Without_input_corrected"
   mkdir -p "$OUT_DIR"
 
   # Adjust window and gap
   if [[ "$MODE" == "broad" ]]; then
-    WINDOW=200; GAP=600
-  else
     WINDOW=100; GAP=200
+  else
+    WINDOW=50; GAP=100
   fi
 
   for CELL in "${CELLTYPES[@]}"; do
@@ -419,7 +417,7 @@ run_sicer2_no_input() {
 
     BAM="${MARK_DIR}/${MARK}_${CELL}.bam"
     if [[ ! -f "$BAM" ]]; then
-      echo " Missing BAM file: $BAM"
+      echo "⚠️ Missing BAM file: $BAM"
       continue
     fi
 
@@ -475,3 +473,4 @@ for MARK in "${NARROW_MARKS[@]}"; do
   get_celltypes_for_mark "$MARK"
   run_sicer2_no_input "$MARK" "narrow"
 done
+
