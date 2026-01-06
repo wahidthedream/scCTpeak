@@ -44,58 +44,28 @@ Dual-mode for H3K27ac: Processed as both broad and sharp
 
 # Dataset Specifications
 
-## Human PBMC Dataset
+## Biological System & Data
 
-Histone Marks: H3K27ac, H3K27me3, H3K9me3, H3K4me1, H3K4me2, H3K4me3
+## Dataset Specifications
 
-Cell Types: B, CD4T, CD8T, DC, Mono, NK, otherT, other (8 types)
-
-Genome: hg38
-
-Total Conditions: 6 marks × 8 cells × 2 (with /without input control) = 96 per tool
-
-## Mouse Brain Dataset
-
-Targets: H3K27ac, H3K27me3, H3K36me3, H3K4me3, Olig2, Rad21
-
-Cell Types: Astrocytes, mOL, OEC, OPC, VLMC, Microglia, Neurons(1-3), Unknown
-
-Genome: mm10
-
-Cell-type specific: Different cell populations per histone mark
+| System | Accession | Epigenomic Targets | Cell Types (n) | Genome Assembly |
+|--------|-----------|-------------------|----------------|-----------------|
+| **Human PBMC** | GSE195725 | **Histone modifications**<br>• H3K27ac<br>• H3K27me3<br>• H3K4me1<br>• H3K4me2<br>• H3K4me3<br>• H3K9me3 | **8 Cell types**<br>B cells, CD4 T, CD8 T, DC, Mono, NK, other T, other | GRCh38 (hg38) |
+| **Mouse Brain** | GSE157637 | **Histone modifications**<br>• H3K27ac<br>• H3K27me3<br>• H3K36me3<br>• H3K4me3<br>**Transcription factors**<br>• Olig2<br>• Rad21 | **Cell-types**<br>• H3K27ac: Astrocytes, mOL, OEC, OPC, VLMC (n=5)<br>• H3K27me3: Astrocytes, Microglia, mOL, Neurons1, Neurons3, OEC, OPC, VLMC (n=8)<br>• H3K36me3: Astrocytes, mOL, OEC, OPC (n=4)<br>• H3K4me3: Astrocytes, Microglia, mOL, Neurons1–3, OEC, OPC, VLMC (n=9)<br>• Olig2: Astrocytes, mOL, OEC, Unknown (n=4)<br>• Rad21: Astrocytes, mOL, OEC, Unknown (n=4) | GRCm38 (mm10) |
 
 # Tool-Specific Configurations
 
-### DROMPAplus
-```bash
-Broad marks: p_int=4, p_enr=3
-Sharp marks: p_int=5, p_enr=4
-Preprocessing: parse2wig+ for bigWig generation
-````
-### Genrich
-```bash
-Broad: -a 100 -l 500 -g 1000 -p 0.05
-Sharp: -a 200 -l 100 -g 100 -p 0.01
-Requirement: Queryname-sorted BAMs
-````
-### MACS2
-```bash
-Genome size: Human=2.7e9, Mouse=1.87e9
-Mode: BAMPE for paired-end
-FDR: 0.05 for both broad and narrow (sharp)
---keep-dup all
-```
-### SEACR
-```bash
-Threshold: Stringent (broad) vs Relaxed (narrow)
-Input: bedGraph files from BAM coverage
-```
-### SICER2
-```bash
-Broad: window=100, gap=200
-Narrow: window=50, gap=100
-FDR: 0.05 across all
-```
+| Tool | Version | Broad Parameters | Sharp Parameters | Key Features |
+|------|---------|------------------|------------------|--------------|
+| **DROMPAplus** | v1.20.1 | `p_int=4, p_enr=3` | `p_int=5, p_enr=4` | parse2wig+ preprocessing, paired-end optimized |
+| **Genrich** | v0.6.1 | `-a 100 -l 500 -g 1000 -p 0.05` | `-a 200 -l 100 -g 100 -p 0.01` | Requires queryname-sorted BAMs, ATAC-seq optimized |
+| **GoPeaks** | v1.0.0 | `--broad` | Default sharp | ATAC-seq optimized |
+| **HOMER** | v5.1 | `histone` | `factor` | motif analysis |
+| **MACS2** | v2.2.9.1 | `--broad --broad-cutoff 0.05` | Default sharp settings | BAMPE mode, FDR=0.05, --keep dup all |
+| **SEACR** | v1.3 | Stringent threshold | Relaxed threshold | bedGraph input from coverage, CUT&RUN/Tag specialized |
+| **SICER2** | v1.0.3 | `window=100, gap=200` | `window=50, gap=100` | FDR=0.05, spatial clustering for broad domains |
+
+
 ## Key Features
 1. Unified peak-calling interface
 For each cell type, we constructed a pseudo-input by pooling fragments from all remaining cell types.
