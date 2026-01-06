@@ -213,24 +213,12 @@ OUT_BASE="/home/wahid/project_scHMTF/GSE157637_processed_data/splitbam_realbam/M
 get_celltypes_for_mark() {
   local MARK="$1"
   case "$MARK" in
-    H3K27ac)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC" "VLMC")
-      ;;
-    H3K27me3)
-      CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons3" "OEC" "OPC" "VLMC")
-      ;;
-    H3K36me3)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC")
-      ;;
-    H3K4me3)
-      CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons2" "Neurons3" "OEC" "OPC" "VLMC")
-      ;;
-    Olig2)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown")
-      ;;
-    Rad21)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown")
-      ;;
+    H3K27ac) CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC" "VLMC") ;;
+    H3K27me3) CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons3" "OEC" "OPC" "VLMC") ;;
+    H3K36me3) CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC") ;;
+    H3K4me3) CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons2" "Neurons3" "OEC" "OPC" "VLMC") ;;
+    Olig2) CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown") ;;
+    Rad21) CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown") ;;
     *)
       echo "⚠️ Unknown mark: $MARK"
       CELLTYPES=()
@@ -345,24 +333,12 @@ OUT_BASE="/home/wahid/project_scHMTF/GSE157637_processed_data/splitbam_realbam/M
 get_celltypes_for_mark() {
   local MARK="$1"
   case "$MARK" in
-    H3K27ac)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC" "VLMC")
-      ;;
-    H3K27me3)
-      CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons3" "OEC" "OPC" "VLMC")
-      ;;
-    H3K36me3)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC")
-      ;;
-    H3K4me3)
-      CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons2" "Neurons3" "OEC" "OPC" "VLMC")
-      ;;
-    Olig2)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown")
-      ;;
-    Rad21)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown")
-      ;;
+    H3K27ac) CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC" "VLMC") ;;
+    H3K27me3) CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons3" "OEC" "OPC" "VLMC") ;;
+    H3K36me3) CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC") ;;
+    H3K4me3) CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons2" "Neurons3" "OEC" "OPC" "VLMC") ;;
+    Olig2) CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown") ;;
+    Rad21) CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown") ;;
     *)
       echo "⚠️ Unknown mark: $MARK"
       CELLTYPES=()
