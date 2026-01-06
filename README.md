@@ -58,7 +58,7 @@ Broad vs Sharp: Parameter optimization per mark type
 | **GoPeaks** | v1.0.0 | `--broad` | Default sharp | ATAC-seq optimized |
 | **HOMER** | v5.1 | `histone` | `factor` | motif analysis |
 | **MACS2** | v2.2.9.1 | `--broad --broad-cutoff 0.05` | Default sharp settings | BAMPE mode, FDR=0.05, --keep dup all |
-| **SEACR** | v1.3 | Stringent threshold | Relaxed threshold | bedGraph input from coverage, CUT&RUN/Tag specialized |
+| **SEACR** | v1.3 | `stringent` threshold | `relaxed` threshold | bedGraph input from coverage, CUT&RUN/Tag specialized |
 | **SICER2** | v1.0.3 | `window=100, gap=200` | `window=50, gap=100` | FDR=0.05, spatial clustering for broad domains |
 
 
