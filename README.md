@@ -29,7 +29,7 @@ The pipeline benchmarks the following tools:
 
 ## Experimental Conditions
 
-With Input Control: Using matched input BAMs
+With Input Control: For each cell type, we constructed input by pooling sequencing fragments from all other cell types.
 
 Without Input Control: Peak calling on treatment-only data
 
