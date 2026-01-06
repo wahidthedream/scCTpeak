@@ -69,3 +69,11 @@ This cross-cell-type input strategies:
 - Provides balanced background signal
 - Reduces cell-type-specific bias
 - Improves peak-calling robustness in scCUT&Tag data
+
+## Quick Start
+
+```bash
+# Clone repository
+git clone https://github.com/wahidthedream/scCTPEAK
+cd scCTPEAK
+
