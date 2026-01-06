@@ -79,12 +79,12 @@ Sharp: -a 200 -l 100 -g 100 -p 0.01
 Requirement: Queryname-sorted BAMs
 
 ### MACS2
-bash
+```bash
 Genome size: Human=2.7e9, Mouse=1.87e9
 Mode: BAMPE for paired-end
 FDR: 0.05 for both broad and narrow (sharp)
 --keep-dup all
-
+```
 ### SEACR
 bash
 Threshold: Stringent (broad) vs Relaxed (narrow)
