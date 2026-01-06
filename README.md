@@ -34,7 +34,7 @@ With Input Control: For each cell type, we constructed input by pooling sequenci
 Without Input Control: Peak calling on treatment-only data
 
 Broad vs Sharp: Parameter optimization per mark type
-### Conserved and divergent peak-type patterns across biological systems
+### Conserved and divergent peak-type patterns across HMs and TFs
 | Category | Human PBMC | Mouse Brain | Conservation Status |
 |----------|------------|-------------|---------------------|
 | **Dual-Mode (Sharp & Broad)** | • H3K27ac | • H3K27ac | Conserved |
