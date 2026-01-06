@@ -67,17 +67,17 @@ Cell-type specific: Different cell populations per histone mark
 # Tool-Specific Configurations
 
 ### DROMPAplus
-bash
+```bash
 Broad marks: p_int=4, p_enr=3
 Sharp marks: p_int=5, p_enr=4
 Preprocessing: parse2wig+ for bigWig generation
-
+````
 ### Genrich
-bash
+```bash
 Broad: -a 100 -l 500 -g 1000 -p 0.05
 Sharp: -a 200 -l 100 -g 100 -p 0.01
 Requirement: Queryname-sorted BAMs
-
+````
 ### MACS2
 ```bash
 Genome size: Human=2.7e9, Mouse=1.87e9
@@ -86,16 +86,16 @@ FDR: 0.05 for both broad and narrow (sharp)
 --keep-dup all
 ```
 ### SEACR
-bash
+```bash
 Threshold: Stringent (broad) vs Relaxed (narrow)
 Input: bedGraph files from BAM coverage
-
+```
 ### SICER2
-bash
+```bash
 Broad: window=100, gap=200
 Narrow: window=50, gap=100
 FDR: 0.05 across all
-
+```
 ## Key Features
 1. Unified peak-calling interface
 For each cell type, we constructed a pseudo-input by pooling fragments from all remaining cell types.
