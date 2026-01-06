@@ -54,7 +54,7 @@ Broad vs Sharp: Parameter optimization per mark type
 | Tool | Version | Broad Parameters | Sharp Parameters | Key Features |
 |------|---------|------------------|------------------|--------------|
 | **DROMPAplus** | v1.20.1 | `p_int=4, p_enr=3` | `p_int=5, p_enr=4` | parse2wig+ preprocessing, paired-end optimized |
-| **Genrich** | v0.6.1 | `-a 100 -l 500 -g 1000 -p 0.05` | `-a 200 -l 100 -g 100 -p 0.01` | Requires queryname-sorted BAMs, ATAC-seq optimized |
+| **Genrich** | v0.6.1 | `-a 100 -l 500 -g 1000 -p 0.05` | `-a 200 -l 100 -g 100 -p 0.01` | Requires BAMs, ATAC-seq optimized |
 | **GoPeaks** | v1.0.0 | `--broad` | Default sharp | ATAC-seq optimized |
 | **HOMER** | v5.1 | `histone` | `factor` | motif analysis |
 | **MACS2** | v2.2.9.1 | `--broad --broad-cutoff 0.05` | Default sharp settings | BAMPE mode, FDR=0.05, --keep dup all |
@@ -62,7 +62,10 @@ Broad vs Sharp: Parameter optimization per mark type
 | **SICER2** | v1.0.3 | `window=100, gap=200` | `window=50, gap=100` | FDR=0.05, spatial clustering for broad domains |
 
 
-## Key Features
-1. Unified peak-calling interface
+## Unified Input Strategy
 For each cell type, we constructed a pseudo-input by pooling fragments from all remaining cell types.
-In this design, the input control for a given cell type is derived from the complementary cell populations. This cross–cell-type input strategy provides a balanced background signal, reduces cell-type–specific bias, and improves the robustness of peak calling in scCUT&Tag data.
+In this design, the input control for a given cell type is derived from the complementary cell populations.
+This cross-cell-type input strategies:
+- Provides balanced background signal
+- Reduces cell-type-specific bias
+- Improves peak-calling robustness in scCUT&Tag data
