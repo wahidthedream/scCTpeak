@@ -1,3 +1,6 @@
+
+
+
 #!/bin/bash
 ###############################################################################################################
 ### MACS2 Peak Calling with Control (Input BAMs)
@@ -26,8 +29,8 @@ mkdir -p "${OUT_BASE}"
 run_macs2_all_ctrl() {
     local MARK=$1
     local MODE=$2
-    local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams"
-    local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/With_input"
+    local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams_corrected"
+    local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/With_input_corrected"
     mkdir -p "${OUT_DIR}"
 
     echo "==================== Processing ${MARK} (${MODE}) ===================="
@@ -39,14 +42,13 @@ run_macs2_all_ctrl() {
         echo "========== Running MACS2 for: ${CELL} (${MARK}) =========="
 
         if [[ ! -f "$TREAT" || ! -f "$CTRL" ]]; then
-            echo "Missing treatment or control BAM for ${CELL}. Skipping..."
+            echo "⚠️ Missing treatment or control BAM for ${CELL}. Skipping..."
             continue
         fi
 
         # Set parameters
         local QVAL=0.05
-        local EXT=250
-        local ARGS="--nomodel --extsize $EXT -q $QVAL --keep-dup auto"
+        local ARGS=" -q $QVAL --keep-dup all"
 
         if [[ "$MODE" == "broad" ]]; then
             ARGS="$ARGS --broad --broad-cutoff $QVAL"
@@ -61,7 +63,7 @@ run_macs2_all_ctrl() {
             --outdir "$OUT_DIR" \
             $ARGS
 
-        echo "Finished: ${MARK}_${CELL}"
+        echo "✅ Finished: ${MARK}_${CELL}"
         echo
     done
 }
@@ -105,8 +107,8 @@ mkdir -p "${OUT_BASE}"
 run_macs2_no_ctrl() {
     local MARK=$1
     local MODE=$2
-    local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams"
-    local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/Without_input"
+    local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams_corrected"
+    local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/Without_input_corrected"
     mkdir -p "${OUT_DIR}"
 
     echo "==================== Processing ${MARK} (${MODE}) ===================="
@@ -117,14 +119,13 @@ run_macs2_no_ctrl() {
         echo "========== Running MACS2 for: ${CELL} (${MARK}) =========="
 
         if [[ ! -f "$TREAT" ]]; then
-            echo "Missing treatment BAM for ${CELL}. Skipping..."
+            echo "⚠️ Missing treatment BAM for ${CELL}. Skipping..."
             continue
         fi
 
         # Parameters
         local QVAL=0.05
-        local EXT=250
-        local ARGS="--nomodel --extsize $EXT -q $QVAL --keep-dup auto"
+        local ARGS="-q $QVAL --keep-dup all"
 
         if [[ "$MODE" == "broad" ]]; then
             ARGS="$ARGS --broad --broad-cutoff $QVAL"
@@ -170,26 +171,14 @@ NARROW_MARKS=("H3K27ac" "H3K4me3" "Olig2" "Rad21")
 get_celltypes_for_mark() {
   local MARK="$1"
   case "$MARK" in
-    H3K27ac)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC" "VLMC")
-      ;;
-    H3K27me3)
-      CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons3" "OEC" "OPC" "VLMC")
-      ;;
-    H3K36me3)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC")
-      ;;
-    H3K4me3)
-      CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons2" "Neurons3" "OEC" "OPC" "VLMC")
-      ;;
-    Olig2)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown")
-      ;;
-    Rad21)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown")
-      ;;
+    H3K27ac) CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC" "VLMC") ;;
+    H3K27me3) CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons3" "OEC" "OPC" "VLMC") ;;
+    H3K36me3) CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC") ;;
+    H3K4me3) CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons2" "Neurons3" "OEC" "OPC" "VLMC") ;;
+    Olig2) CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown") ;;
+    Rad21) CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown") ;;
     *)
-      echo " Unknown mark: $MARK"
+      echo "⚠️ Unknown mark: $MARK"
       CELLTYPES=()
       ;;
   esac
@@ -197,7 +186,7 @@ get_celltypes_for_mark() {
 
 # Base directories
 BASE_DIR="/home/wahid/project_scHMTF/GSE157637_processed_data/splitbam_realbam"
-OUT_BASE="${BASE_DIR}/MouseBrain_peakbed/MACS2_peakbed"
+OUT_BASE="${BASE_DIR}/MouseBrain_peakbed/MACS2_peakbed_corrected"
 GENOME=1.87e9  # Mouse genome size for MACS2
 
 mkdir -p "${OUT_BASE}"
@@ -209,7 +198,7 @@ run_macs2_all_ctrl() {
     local MARK=$1
     local MODE=$2
     local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams"
-    local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/With_input"
+    local OUT_DIR="${OUT_BASE}/With_input_corrected"
     mkdir -p "${OUT_DIR}"
 
     get_celltypes_for_mark "$MARK"
@@ -222,14 +211,13 @@ run_macs2_all_ctrl() {
         echo "========== Running MACS2 for: ${CELL} (${MARK}) =========="
 
         if [[ ! -f "$TREAT" || ! -f "$CTRL" ]]; then
-            echo "Missing treatment or control BAM for ${CELL}. Skipping..."
+            echo "⚠️ Missing treatment or control BAM for ${CELL}. Skipping..."
             continue
         fi
 
         # Set parameters
         local QVAL=0.05
-        local EXT=250
-        local ARGS="--nomodel --extsize $EXT -q $QVAL --keep-dup auto"
+        local ARGS="-q $QVAL --keep-dup all"
 
         if [[ "$MODE" == "broad" ]]; then
             ARGS="$ARGS --broad --broad-cutoff $QVAL"
@@ -244,7 +232,7 @@ run_macs2_all_ctrl() {
             --outdir "$OUT_DIR" \
             $ARGS
 
-        echo "Finished: ${MARK}_${CELL}"
+        echo "✅ Finished: ${MARK}_${CELL}"
         echo
     done
 }
@@ -264,7 +252,7 @@ done
 
 #!/bin/bash
 ###############################################################################################################
-### MACS2 Peak Calling WITHOUT Control (Input BAMs)
+### MACS2 Peak Calling WITHOUT Control (NO Input BAMs)
 ### Multi-histone processing: Broad + Narrow marks
 ### MouseBrain real BAMs
 ###############################################################################################################
@@ -277,24 +265,12 @@ NARROW_MARKS=("H3K27ac" "H3K4me3" "Olig2" "Rad21")
 get_celltypes_for_mark() {
   local MARK="$1"
   case "$MARK" in
-    H3K27ac)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC" "VLMC")
-      ;;
-    H3K27me3)
-      CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons3" "OEC" "OPC" "VLMC")
-      ;;
-    H3K36me3)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC")
-      ;;
-    H3K4me3)
-      CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons2" "Neurons3" "OEC" "OPC" "VLMC")
-      ;;
-    Olig2)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown")
-      ;;
-    Rad21)
-      CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown")
-      ;;
+    H3K27ac) CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC" "VLMC") ;;
+    H3K27me3) CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons3" "OEC" "OPC" "VLMC") ;;
+    H3K36me3) CELLTYPES=("Astrocytes" "mOL" "OEC" "OPC") ;;
+    H3K4me3) CELLTYPES=("Astrocytes" "Microglia" "mOL" "Neurons1" "Neurons2" "Neurons3" "OEC" "OPC" "VLMC") ;;
+    Olig2) CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown") ;;
+    Rad21) CELLTYPES=("Astrocytes" "mOL" "OEC" "Unknown") ;;
     *)
       echo " Unknown mark: $MARK"
       CELLTYPES=()
@@ -304,7 +280,7 @@ get_celltypes_for_mark() {
 
 # Base directories
 BASE_DIR="/home/wahid/project_scHMTF/GSE157637_processed_data/splitbam_realbam"
-OUT_BASE="${BASE_DIR}/MouseBrain_peakbed/MACS2_peakbed"
+OUT_BASE="${BASE_DIR}/MouseBrain_peakbed/MACS2_peakbed_corrected"
 GENOME=1.87e9  # Mouse genome size for MACS2
 
 mkdir -p "${OUT_BASE}"
@@ -316,7 +292,7 @@ run_macs2_no_ctrl() {
     local MARK=$1
     local MODE=$2
     local MARK_DIR="${BASE_DIR}/${MARK}/split_celltype_bams"
-    local OUT_DIR="${OUT_BASE}/${MARK}_${MODE}/No_input"
+    local OUT_DIR="${OUT_BASE}/Without_input_corrected"
     mkdir -p "${OUT_DIR}"
 
     get_celltypes_for_mark "$MARK"
@@ -333,8 +309,7 @@ run_macs2_no_ctrl() {
 
         # Set parameters
         local QVAL=0.05
-        local EXT=250
-        local ARGS="--nomodel --extsize $EXT -q $QVAL --keep-dup auto"
+        local ARGS="-q $QVAL --keep-dup all"
 
         if [[ "$MODE" == "broad" ]]; then
             ARGS="$ARGS --broad --broad-cutoff $QVAL"
@@ -348,7 +323,7 @@ run_macs2_no_ctrl() {
             --outdir "$OUT_DIR" \
             $ARGS
 
-        echo "Finished: ${MARK}_${CELL}"
+        echo "✅ Finished: ${MARK}_${CELL}"
         echo
     done
 }
@@ -363,5 +338,6 @@ done
 for MARK in "${NARROW_MARKS[@]}"; do
     run_macs2_no_ctrl "$MARK" "narrow"
 done
+
 
 
