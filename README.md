@@ -10,7 +10,7 @@
 The pipeline benchmarks the following tools:
 
 # Key Features
-## 1. Multi-Tool Evaluation (7 Algorithms)
+## Multi-Tool Evaluation (Seven Tools)
 
 **DROMPAplus** - Broad/Sharp peak detection with specialized parameters
 
@@ -26,34 +26,30 @@ The pipeline benchmarks the following tools:
 
 **SICER2** - Spatial clustering approach for broad domains
 
-## 2. Dual Biological Systems
 
-Human PBMC (GSE195725): 8 cell types, 6 histone marks
+## Experimental Conditions
 
-Mouse Brain (GSE157637): 4-9 cell types, 6 histone marks + transcription factors
+With Input Control: Using matched input BAMs
 
-## 3. Experimental Conditions
-
-With Control: Using matched input BAMs
-
-Without Control: Peak calling on treatment-only data
+Without Input Control: Peak calling on treatment-only data
 
 Broad vs Sharp: Parameter optimization per mark type
+### Conserved and divergent peak-type patterns across biological systems
+| Category | Human PBMC | Mouse Brain | Conservation Status |
+|----------|------------|-------------|---------------------|
+| **Dual-Mode (Sharp & Broad)** | • H3K27ac | • H3K27ac | Conserved |
+| **Sharp Peaks** | • H3K4me1<br>• H3K4me2<br>• H3K4me3 | • H3K4me3<br>• Olig2 (TF)<br>• Rad21 (cohesin) | Context-dependent |
+| **Broad Peaks** | • H3K27me3<br>• H3K9me3 | • H3K27me3<br>• H3K36me3 | Conserved |
 
-Dual-mode for H3K27ac: Processed as both broad and sharp
 
-# Dataset Specifications
-
-## Biological System & Data
-
-## Dataset Specifications
+## Biological System & Data Specifications
 
 | System | Accession | Epigenomic Targets | Cell Types (n) | Genome Assembly |
 |--------|-----------|-------------------|----------------|-----------------|
 | **Human PBMC** | GSE195725 | **Histone modifications**<br>• H3K27ac<br>• H3K27me3<br>• H3K4me1<br>• H3K4me2<br>• H3K4me3<br>• H3K9me3 | **8 Cell types**<br>B cells, CD4 T, CD8 T, DC, Mono, NK, other T, other | GRCh38 (hg38) |
 | **Mouse Brain** | GSE157637 | **Histone modifications**<br>• H3K27ac<br>• H3K27me3<br>• H3K36me3<br>• H3K4me3<br>**Transcription factors**<br>• Olig2<br>• Rad21 | **Cell-types**<br>• H3K27ac: Astrocytes, mOL, OEC, OPC, VLMC (n=5)<br>• H3K27me3: Astrocytes, Microglia, mOL, Neurons1, Neurons3, OEC, OPC, VLMC (n=8)<br>• H3K36me3: Astrocytes, mOL, OEC, OPC (n=4)<br>• H3K4me3: Astrocytes, Microglia, mOL, Neurons1–3, OEC, OPC, VLMC (n=9)<br>• Olig2: Astrocytes, mOL, OEC, Unknown (n=4)<br>• Rad21: Astrocytes, mOL, OEC, Unknown (n=4) | GRCm38 (mm10) |
 
-# Tool-Specific Configurations
+## Tool-Specific Configurations
 
 | Tool | Version | Broad Parameters | Sharp Parameters | Key Features |
 |------|---------|------------------|------------------|--------------|
