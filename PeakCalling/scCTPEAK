@@ -9,8 +9,8 @@
 # ===========================================================================================
 # GLOBAL CONFIGURATION
 # ===========================================================================================
-SCCTPEAK_VERSION="2.0.0"
-SCCTPEAK_AUTHOR="Wahid et al."
+SCCTPEAK_VERSION="1.0.0"
+SCCTPEAK_AUTHOR="Wahiduzzaman, M., et al."
 
 # Default paths (MUST BE UPDATED TO MATCH YOUR SYSTEM)
 SCCTPEAK_HOME="${HOME}/project_scHMTF"
