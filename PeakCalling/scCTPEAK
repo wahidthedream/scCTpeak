@@ -1,0 +1,1325 @@
+```bash
+#!/bin/bash
+#############################################################################################
+### scCTPEAK: A Complete Benchmark Suite for scCUT&Tag Peak-Calling
+### Unified Function for All Tools, Datasets, and Configurations
+### WITH CELL TYPE SUPPORT - FINAL VERSION
+#############################################################################################
+
+# ===========================================================================================
+# GLOBAL CONFIGURATION
+# ===========================================================================================
+SCCTPEAK_VERSION="2.0.0"
+SCCTPEAK_AUTHOR="Wahid et al."
+
+# Default paths (MUST BE UPDATED TO MATCH YOUR SYSTEM)
+SCCTPEAK_HOME="${HOME}/project_scHMTF"
+HUMAN_PBMC_DIR="${SCCTPEAK_HOME}/GSE195725_processed_data"
+MOUSE_BRAIN_DIR="${SCCTPEAK_HOME}/GSE157637_processed_data"
+
+# Tool paths (UPDATE THESE TO MATCH YOUR INSTALLATIONS)
+SEACR_SCRIPT="/home/wahid/tools/SEACR/SEACR_1.3.sh"
+DROMPA_DIR="/home/wahid/DROMPAplus/bin"  # ADDED: DROMPAplus path
+
+# Threads for parallel processing
+THREADS=32
+
+# ===========================================================================================
+# DATASET CONFIGURATIONS WITH CELL TYPES
+# ===========================================================================================
+declare -A DATASET_CONFIGS=(
+    # Human PBMC dataset
+    ["human_pbmc_broad_marks"]="H3K27ac H3K27me3 H3K9me3"
+    ["human_pbmc_narrow_marks"]="H3K27ac H3K4me1 H3K4me2 H3K4me3"
+    ["human_pbmc_all_cell_types"]="B CD4T CD8T DC Mono NK otherT other"
+    ["human_pbmc_genome_size"]="2.7e9"
+    ["human_pbmc_genome"]="hg38"
+    ["human_pbmc_chromsizes"]="${HUMAN_PBMC_DIR}/ref/hg38.chrom.sizes"
+    ["human_pbmc_genome_file"]="${HUMAN_PBMC_DIR}/ref/genome_file.txt"
+    ["human_pbmc_gene_annot"]="${HUMAN_PBMC_DIR}/ref/refFlat.dupremoved.txt"
+    
+    # Mouse Brain dataset
+    ["mouse_brain_broad_marks"]="H3K27ac H3K27me3 H3K36me3"
+    ["mouse_brain_narrow_marks"]="H3K27ac H3K4me3 Olig2 Rad21"
+    ["mouse_brain_genome_size"]="1.87e9"
+    ["mouse_brain_genome"]="mm10"
+    ["mouse_brain_chromsizes"]="${MOUSE_BRAIN_DIR}/ref/mm10.chrom.sizes"
+    ["mouse_brain_genome_file"]="${MOUSE_BRAIN_DIR}/ref/mm10.genome_file.txt"
+    ["mouse_brain_gene_annot"]="${MOUSE_BRAIN_DIR}/ref/refFlat.dupremoved.txt"
+)
+
+# Cell type mapping for mouse brain (histone-specific)
+get_mouse_cell_types() {
+    local histone="$1"
+    case "$histone" in
+        H3K27ac) echo "Astrocytes mOL OEC OPC VLMC" ;;
+        H3K27me3) echo "Astrocytes Microglia mOL Neurons1 Neurons3 OEC OPC VLMC" ;;
+        H3K36me3) echo "Astrocytes mOL OEC OPC" ;;
+        H3K4me3) echo "Astrocytes Microglia mOL Neurons1 Neurons2 Neurons3 OEC OPC VLMC" ;;
+        Olig2|Rad21) echo "Astrocytes mOL OEC Unknown" ;;
+        *) echo "" ;;
+    esac
+}
+
+# Get specific cell types for mouse brain
+get_mouse_cell_type() {
+    local histone="$1"
+    local cell_type="$2"
+    
+    # First get all cell types for this histone
+    IFS=' ' read -r -a ALL_CELLS <<< "$(get_mouse_cell_types "$histone")"
+    
+    # If cell_type is "all", return all cells
+    if [[ "$cell_type" == "all" ]]; then
+        echo "${ALL_CELLS[@]}"
+        return
+    fi
+    
+    # Check if requested cell type exists for this histone
+    for cell in "${ALL_CELLS[@]}"; do
+        if [[ "$cell" == "$cell_type" ]]; then
+            echo "$cell_type"
+            return
+        fi
+    done
+    
+    # If not found, return empty
+    echo ""
+}
+
+# Get cell types for any dataset
+get_cell_types() {
+    local dataset="$1"
+    local histone="$2"
+    local cell_type="$3"
+    
+    if [[ "$dataset" == "human_pbmc" ]]; then
+        if [[ "$cell_type" == "all" ]]; then
+            echo "${DATASET_CONFIGS[human_pbmc_all_cell_types]}"
+        else
+            echo "$cell_type"
+        fi
+    else
+        if [[ "$cell_type" == "all" ]]; then
+            get_mouse_cell_types "$histone"
+        else
+            get_mouse_cell_type "$histone" "$cell_type"
+        fi
+    fi
+}
+
+# ===========================================================================================
+# UTILITY FUNCTIONS
+# ===========================================================================================
+validate_bam_files() {
+    local base_dir="$1"
+    local histone="$2"
+    local cell="$3"
+    
+    local treatment_bam="${base_dir}/${histone}/${histone}_${cell}.bam"
+    local input_bam="${base_dir}/${histone}/input_${cell}.bam"
+    
+    if [[ ! -f "$treatment_bam" ]]; then
+        echo "❌ Treatment BAM not found: $treatment_bam"
+        return 1
+    fi
+    
+    # Check if input exists (not required for without_input mode)
+    if [[ "$4" == "check_input" ]] && [[ ! -f "$input_bam" ]]; then
+        echo "❌ Input BAM not found: $input_bam"
+        return 1
+    fi
+    
+    return 0
+}
+
+print_header() {
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════════════════════════╗"
+    echo "║ $1"
+    echo "╚══════════════════════════════════════════════════════════════════════════════════╝"
+    echo ""
+}
+
+print_step() {
+    echo "↳ $1"
+}
+
+# ===========================================================================================
+# CORE FUNCTIONS WITH CELL TYPE SUPPORT
+# ===========================================================================================
+
+# -------------------------------------------------------------------------------------------
+# DROMPAplus Functions with Cell Type Support
+# -------------------------------------------------------------------------------------------
+run_drompa_parse2wig() {
+    local dataset="$1"
+    local histone="$2"
+    local cell_type="$3"
+    
+    print_header "DROMPAplus parse2wig+ | Dataset: $dataset | Histone: $histone | Cell: $cell_type"
+    
+    # Set dataset-specific paths
+    if [[ "$dataset" == "human_pbmc" ]]; then
+        BASE_DIR="${HUMAN_PBMC_DIR}/BAM/celltypeswisebam_50bp"
+        GENOME_FILE="${DATASET_CONFIGS[human_pbmc_genome_file]}"
+    else
+        BASE_DIR="${MOUSE_BRAIN_DIR}/result/celltypeswisebam_50bp"
+        GENOME_FILE="${DATASET_CONFIGS[mouse_brain_genome_file]}"
+    fi
+    
+    # Get cell types
+    IFS=' ' read -r -a CELL_TYPES <<< "$(get_cell_types "$dataset" "$histone" "$cell_type")"
+    
+    # Check if we have valid cell types
+    if [[ ${#CELL_TYPES[@]} -eq 0 ]] || [[ -z "${CELL_TYPES[0]}" ]]; then
+        echo "❌ Error: No valid cell types found for $histone with cell_type=$cell_type"
+        return 1
+    fi
+    
+    OUT_DIR="${BASE_DIR}/DROMPAplus_peakbed_test/${histone}"
+    mkdir -p "$OUT_DIR"
+    cd "$OUT_DIR"
+    # Debug: Show paths
+    print_step "Base directory: $BASE_DIR"
+    print_step "Output directory: $OUT_DIR"
+    print_step "Cell types to process: ${CELL_TYPES[*]}"
+    
+    for cell in "${CELL_TYPES[@]}"; do
+        print_step "Processing ${histone} treatment - $cell"
+        
+        # Validate BAM files
+        if ! validate_bam_files "$BASE_DIR" "$histone" "$cell"; then
+            continue
+        fi
+        
+        # Use full path to parse2wig+
+        "${DROMPA_DIR}/parse2wig+" -i "${BASE_DIR}/${histone}/${histone}_${cell}.bam" \
+                   -o ${histone}.${cell} \
+                   --pair \
+                   --gt "$GENOME_FILE" \
+                   -n GR
+        
+        print_step "Processing input - $cell"
+        "${DROMPA_DIR}/parse2wig+" -i "${BASE_DIR}/${histone}/input_${cell}.bam" \
+                   -o input.${cell} \
+                   --pair \
+                   --gt "$GENOME_FILE" \
+                   -n GR
+    done
+    
+    echo "✅ Completed parse2wig+ for $histone (Cells: ${CELL_TYPES[*]})"
+    echo ""
+}
+
+run_drompa_peakcalling() {
+    local dataset="$1"
+    local histone="$2"
+    local cell_type="$3"
+    local mode="$4"
+    local control="$5"
+    
+    print_header "DROMPAplus Peak Calling | $dataset | $histone | Cell: $cell_type | $mode | $control"
+    
+    # Convert mode to uppercase for DROMPAplus
+    local DROMPA_MODE
+    if [[ "$mode" == "broad" ]]; then
+        DROMPA_MODE="BROAD"
+        P_INT=4
+        P_ENR=3
+    else
+        DROMPA_MODE="SHARP"  # DROMPA uses "SHARP" not "narrow"
+        P_INT=5
+        P_ENR=4
+    fi
+    
+    # Set dataset-specific paths
+    if [[ "$dataset" == "human_pbmc" ]]; then
+        BASE_DIR="${HUMAN_PBMC_DIR}/BAM/celltypeswisebam_50bp"
+        GENOME_FILE="${DATASET_CONFIGS[human_pbmc_genome_file]}"
+        GENE_ANNOT="${DATASET_CONFIGS[human_pbmc_gene_annot]}"
+    else
+        BASE_DIR="${MOUSE_BRAIN_DIR}/result/celltypeswisebam_50bp"
+        GENOME_FILE="${DATASET_CONFIGS[mouse_brain_genome_file]}"
+        GENE_ANNOT="${DATASET_CONFIGS[mouse_brain_gene_annot]}"
+    fi
+    
+    # Validate required files exist
+    if [[ ! -f "$GENOME_FILE" ]]; then
+        echo "❌ Error: Genome file not found: $GENOME_FILE"
+        return 1
+    fi
+    
+    if [[ ! -f "$GENE_ANNOT" ]]; then
+        echo "❌ Error: Gene annotation file not found: $GENE_ANNOT"
+        return 1
+    fi
+    
+    # Get cell types
+    IFS=' ' read -r -a CELL_TYPES <<< "$(get_cell_types "$dataset" "$histone" "$cell_type")"
+    
+    # Check if we have valid cell types
+    if [[ ${#CELL_TYPES[@]} -eq 0 ]] || [[ -z "${CELL_TYPES[0]}" ]]; then
+        echo "❌ Error: No valid cell types found for $histone with cell_type=$cell_type"
+        return 1
+    fi
+    
+    PARSE_DIR="${BASE_DIR}/DROMPAplus_peakbed_test/${histone}/parse2wigdir+"
+    OUT_DIR="${BASE_DIR}/DROMPAplus_peakbed_test/${histone}/peakbed_${control}_${mode}/DROMPAplus"
+    mkdir -p "$OUT_DIR"
+    
+    # Check if PARSE_DIR exists
+    if [[ ! -d "$PARSE_DIR" ]]; then
+        echo "❌ Error: parse2wig+ output directory not found: $PARSE_DIR"
+        echo "   Please run 'scCTPEAK parse2wig $dataset $histone $cell_type' first"
+        return 1
+    fi
+    
+    # Build input string using array (safer approach)
+    local -a input_args=()
+    local file_count=0
+    
+    for cell in "${CELL_TYPES[@]}"; do
+        local label=""
+        if [[ "$histone" == "H3K27ac" ]]; then
+            if [[ "$mode" == "broad" ]]; then
+                label="${histone}_b_${cell}"
+            else
+                label="${histone}_s_${cell}"
+            fi
+        else
+            label="${histone}_${cell}"
+        fi
+        
+        # Check if files exist
+        TREATMENT_BW="${PARSE_DIR}/${histone}.${cell}.100.bw"
+        if [[ ! -f "$TREATMENT_BW" ]]; then
+            echo "⚠️ Warning: Treatment file not found: $TREATMENT_BW"
+            continue
+        fi
+        
+        if [[ "$control" == "with_input" ]]; then
+            CONTROL_BW="${PARSE_DIR}/input.${cell}.100.bw"
+            if [[ ! -f "$CONTROL_BW" ]]; then
+                echo "⚠️ Warning: Control file not found: $CONTROL_BW"
+                continue
+            fi
+            input_args+=("-i" "${TREATMENT_BW},${CONTROL_BW},${label},,,100")
+        else
+            input_args+=("-i" "${TREATMENT_BW},,${label},,,100")
+        fi
+        ((file_count++))
+    done
+    
+    # Check if we have any inputs
+    if [[ $file_count -eq 0 ]]; then
+        echo "❌ Error: No valid input files found for DROMPAplus"
+        return 1
+    fi
+    
+    # Build command using array (much safer than string building with eval)
+    local -a cmd_args=(
+        "${DROMPA_DIR}/drompa+"
+        "PC_${DROMPA_MODE}"
+    )
+    
+    # Add all input arguments
+    cmd_args+=("${input_args[@]}")
+    
+    # Add remaining arguments
+    cmd_args+=(
+        "-o" "$OUT_DIR"
+        "--gt" "$GENOME_FILE"
+        "-g" "$GENE_ANNOT"
+        "--lpp" "5"
+        "--showitag" "1"
+        "--callpeak"
+        "--pthre_internal" "$P_INT"
+    )
+    
+    # Add enrichment threshold if using input control
+    if [[ "$control" == "with_input" ]]; then
+        cmd_args+=("--pthre_enrich" "$P_ENR")
+    fi
+    
+    print_step "Running: drompa+ PC_${DROMPA_MODE}"
+    print_step "Output directory: $OUT_DIR"
+    print_step "Number of samples: $file_count"
+    
+    # Create log file
+    local LOG_FILE="${OUT_DIR}/drompa_peakcalling.log"
+    
+    # Execute command with proper error handling
+    echo "Command: ${cmd_args[*]}" | tee "$LOG_FILE"
+    echo "Started at: $(date)" | tee -a "$LOG_FILE"
+    echo "" | tee -a "$LOG_FILE"
+    
+    # Execute the command
+    if "${cmd_args[@]}" >> "$LOG_FILE" 2>&1; then
+        echo "✅ DROMPAplus completed successfully"
+        echo "   Output directory: $OUT_DIR"
+        echo "   Log file: $LOG_FILE"
+        
+        # Check if peak files were generated
+        local peak_files=$(find "$OUT_DIR" -name "*peak.bed" -o -name "*peak*.txt" 2>/dev/null | wc -l)
+        if [[ $peak_files -gt 0 ]]; then
+            echo "   Generated $peak_files peak files"
+            find "$OUT_DIR" -name "*peak*" -type f | head -5 | while read -r file; do
+                echo "   - $(basename "$file") ($(wc -l < "$file" | awk '{print $1}') peaks)"
+            done
+        else
+            echo "⚠️ Warning: No peak files found in output directory"
+        fi
+    else
+        local exit_code=$?
+        echo "❌ DROMPAplus failed with exit code: $exit_code"
+        echo "   Check log file for details: $LOG_FILE"
+        echo "   Last 10 lines of log:"
+        tail -10 "$LOG_FILE"
+        return $exit_code
+    fi
+    
+    echo ""
+}
+# -------------------------------------------------------------------------------------------
+# MACS2 Functions with Cell Type Support
+# -------------------------------------------------------------------------------------------
+run_macs2() {
+    local dataset="$1"
+    local histone="$2"
+    local cell_type="$3"
+    local mode="$4"
+    local control="$5"
+    
+    print_header "MACS2 | $dataset | $histone | Cell: $cell_type | $mode | $control"
+    
+    # Set parameters
+    local QVAL=0.05
+    local ARGS="-q $QVAL --keep-dup all"
+    [[ "$mode" == "broad" ]] && ARGS="$ARGS --broad --broad-cutoff $QVAL"
+    
+    # Set dataset-specific paths
+    if [[ "$dataset" == "human_pbmc" ]]; then
+        BASE_DIR="${HUMAN_PBMC_DIR}/BAM/celltypeswisebam_50bp"
+        GENOME="${DATASET_CONFIGS[human_pbmc_genome_size]}"
+    else
+        BASE_DIR="${MOUSE_BRAIN_DIR}/result/celltypeswisebam_50bp"
+        GENOME="${DATASET_CONFIGS[mouse_brain_genome_size]}"
+    fi
+    
+    # Get cell types
+    IFS=' ' read -r -a CELL_TYPES <<< "$(get_cell_types "$dataset" "$histone" "$cell_type")"
+    
+    # Check if we have valid cell types
+    if [[ ${#CELL_TYPES[@]} -eq 0 ]] || [[ -z "${CELL_TYPES[0]}" ]]; then
+        echo "❌ Error: No valid cell types found for $histone with cell_type=$cell_type"
+        return 1
+    fi
+    
+    # Create output directory
+    local OUT_DIR="${BASE_DIR}/MACS2_peakbed_test"
+    if [[ "$control" == "with_input" ]]; then
+        OUT_DIR="${OUT_DIR}/With_input"
+    else
+        OUT_DIR="${OUT_DIR}/Without_input"
+    fi
+    mkdir -p "$OUT_DIR"
+    
+    for cell in "${CELL_TYPES[@]}"; do
+        print_step "Processing: ${histone}_${cell}"
+        
+        local TREAT="${BASE_DIR}/${histone}/${histone}_${cell}.bam"
+        if [[ ! -f "$TREAT" ]]; then
+            echo "⚠️ Missing treatment BAM: $TREAT"
+            continue
+        fi
+        
+        # Build command
+        local cmd="macs2 callpeak -t \"$TREAT\" -f BAMPE -g \"$GENOME\" -n \"${histone}_${cell}_${mode}\" --outdir \"$OUT_DIR\" $ARGS"
+        
+        if [[ "$control" == "with_input" ]]; then
+            local CTRL="${BASE_DIR}/${histone}/input_${cell}.bam"
+            if [[ -f "$CTRL" ]]; then
+                cmd="macs2 callpeak -t \"$TREAT\" -c \"$CTRL\" -f BAMPE -g \"$GENOME\" -n \"${histone}_${cell}_${mode}\" --outdir \"$OUT_DIR\" $ARGS"
+            else
+                echo "⚠️ Missing control BAM: $CTRL"
+                continue
+            fi
+        fi
+        
+        # Run MACS2
+        eval "$cmd"
+        
+        if [[ $? -eq 0 ]]; then
+            echo "  ✅ Finished: ${histone}_${cell}"
+        else
+            echo "  ❌ Failed: ${histone}_${cell}"
+        fi
+    done
+    echo ""
+}
+
+# -------------------------------------------------------------------------------------------
+# Genrich Functions with Cell Type Support
+# -------------------------------------------------------------------------------------------
+run_genrich() {
+    local dataset="$1"
+    local histone="$2"
+    local cell_type="$3"
+    local mode="$4"
+    local control="$5"
+    
+    print_header "Genrich | $dataset | $histone | Cell: $cell_type | $mode | $control"
+    
+    # Set parameters
+    local SORT_TAG="qname_sorted_${mode:0:1}"  # b for broad, s for narrow
+    
+    if [[ "$mode" == "broad" ]]; then
+        GENRICH_ARGS="-a 100 -l 500 -g 1000 -p 0.05 -f BAM"
+        EXT=".broadPeak"
+    else
+        GENRICH_ARGS="-a 200 -l 100 -g 100 -p 0.01 -f BAM"
+        EXT=".narrowPeak"
+    fi
+    
+    # Set dataset-specific paths
+    if [[ "$dataset" == "human_pbmc" ]]; then
+        BASE_DIR="${HUMAN_PBMC_DIR}/BAM/celltypeswisebam_50bp"
+    else
+        BASE_DIR="${MOUSE_BRAIN_DIR}/result/celltypeswisebam_50bp"
+    fi
+    
+    # Get cell types
+    IFS=' ' read -r -a CELL_TYPES <<< "$(get_cell_types "$dataset" "$histone" "$cell_type")"
+    
+    # Check if we have valid cell types
+    if [[ ${#CELL_TYPES[@]} -eq 0 ]] || [[ -z "${CELL_TYPES[0]}" ]]; then
+        echo "❌ Error: No valid cell types found for $histone with cell_type=$cell_type"
+        return 1
+    fi
+    
+    local MARK_LABEL="${histone}_${mode}"
+    local MARK_DIR="${BASE_DIR}/${histone}"
+    local SORTED_DIR="${MARK_DIR}/${SORT_TAG}"
+    
+    # Create output directory
+    local OUT_BASE="${BASE_DIR}/Genrich_peakbed_test"
+    local OUT_DIR="${OUT_BASE}/${MARK_LABEL}"
+    if [[ "$control" == "with_input" ]]; then
+        OUT_DIR="${OUT_DIR}/With_input"
+    else
+        OUT_DIR="${OUT_DIR}/Without_input"
+    fi
+    
+    mkdir -p "$OUT_DIR" "$SORTED_DIR"
+    
+    for cell in "${CELL_TYPES[@]}"; do
+        print_step "Processing: $histone ($cell)"
+        
+        local RAW_TREATMENT="${MARK_DIR}/${histone}_${cell}.bam"
+        local TREATMENT="${SORTED_DIR}/${histone}_${cell}_qnamesorted.bam"
+        local OUTPUT_FILE="${OUT_DIR}/${cell}_${MARK_LABEL}_peaks${EXT}"
+        local LOG_FILE="${OUT_DIR}/${cell}_${MARK_LABEL}_genrich.log"
+        
+        if [[ ! -f "$RAW_TREATMENT" ]]; then
+            echo "  ❌ Missing treatment BAM: $RAW_TREATMENT"
+            continue
+        fi
+        
+        # Sort BAM if needed
+        if [[ ! -f "$TREATMENT" ]]; then
+            print_step "Sorting treatment BAM..."
+            samtools sort -n -@ $THREADS -o "$TREATMENT" "$RAW_TREATMENT" >> "$LOG_FILE" 2>&1
+        fi
+        
+        # Build command
+        local cmd="Genrich -t \"$TREATMENT\" -o \"$OUTPUT_FILE\" -j -r -v $GENRICH_ARGS"
+        
+        if [[ "$control" == "with_input" ]]; then
+            local RAW_CONTROL="${MARK_DIR}/input_${cell}.bam"
+            local CONTROL="${SORTED_DIR}/input_${cell}_qnamesorted.bam"
+            
+            if [[ ! -f "$RAW_CONTROL" ]]; then
+                echo "  ❌ Missing control BAM: $RAW_CONTROL"
+                continue
+            fi
+            
+            if [[ ! -f "$CONTROL" ]]; then
+                print_step "Sorting control BAM..."
+                samtools sort -n -@ $THREADS -o "$CONTROL" "$RAW_CONTROL" >> "$LOG_FILE" 2>&1
+            fi
+            
+            cmd="Genrich -t \"$TREATMENT\" -c \"$CONTROL\" -o \"$OUTPUT_FILE\" -j -r -v $GENRICH_ARGS"
+        fi
+        
+        # Run Genrich
+        print_step "Running Genrich..."
+        eval "$cmd" >> "$LOG_FILE" 2>&1
+        
+        if [[ $? -eq 0 ]]; then
+            echo "  ✅ Completed: $cell"
+        else
+            echo "  ❌ Failed: $cell"
+        fi
+    done
+    
+    # Peak summary
+    echo ""
+    echo "Peak Summary for $MARK_LABEL:"
+    for peakfile in "$OUT_DIR"/*"$EXT"; do
+        [[ -f "$peakfile" ]] && echo "  $(basename "$peakfile"): $(wc -l < "$peakfile") peaks"
+    done
+    echo ""
+}
+
+# -------------------------------------------------------------------------------------------
+# GoPeaks Functions with Cell Type Support
+# -------------------------------------------------------------------------------------------
+run_gopeaks() {
+    local dataset="$1"
+    local histone="$2"
+    local cell_type="$3"
+    local mode="$4"
+    local control="$5"
+    
+    print_header "GoPeaks | $dataset | $histone | Cell: $cell_type | $mode | $control"
+    
+    # Set dataset-specific paths
+    if [[ "$dataset" == "human_pbmc" ]]; then
+        BASE_DIR="${HUMAN_PBMC_DIR}/BAM/celltypeswisebam_50bp"
+        CHROMSIZE="${DATASET_CONFIGS[human_pbmc_chromsizes]}"
+    else
+        BASE_DIR="${MOUSE_BRAIN_DIR}/result/celltypeswisebam_50bp"
+        CHROMSIZE="${DATASET_CONFIGS[mouse_brain_chromsizes]}"
+    fi
+    
+    # Get cell types
+    IFS=' ' read -r -a CELL_TYPES <<< "$(get_cell_types "$dataset" "$histone" "$cell_type")"
+    
+    # Check if we have valid cell types
+    if [[ ${#CELL_TYPES[@]} -eq 0 ]] || [[ -z "${CELL_TYPES[0]}" ]]; then
+        echo "❌ Error: No valid cell types found for $histone with cell_type=$cell_type"
+        return 1
+    fi
+    
+    # Create output directory
+    local OUT_BASE="${BASE_DIR}/GoPeaks_peakbed_test"
+    local OUT_DIR="${OUT_BASE}/${histone}_${mode}"
+    if [[ "$control" == "with_input" ]]; then
+        OUT_DIR="${OUT_DIR}/With_input"
+    else
+        OUT_DIR="${OUT_DIR}/Without_input"
+    fi
+    mkdir -p "$OUT_DIR"
+    
+    for cell in "${CELL_TYPES[@]}"; do
+        print_step "Processing: ${histone}_${cell}"
+        
+        local BAM="${BASE_DIR}/${histone}/${histone}_${cell}.bam"
+        local PREFIX="${OUT_DIR}/${histone}_${cell}_${mode}"
+        
+        if [[ ! -f "$BAM" ]]; then
+            echo "  ⚠️ Missing BAM file: $BAM"
+            continue
+        fi
+        
+        # Build command
+        local cmd="gopeaks -b \"$BAM\" -s \"$CHROMSIZE\" -o \"$PREFIX\""
+        [[ "$mode" == "broad" ]] && cmd="$cmd --broad"
+        
+        if [[ "$control" == "with_input" ]]; then
+            local CTRL="${BASE_DIR}/${histone}/input_${cell}.bam"
+            if [[ -f "$CTRL" ]]; then
+                cmd="gopeaks -b \"$BAM\" -c \"$CTRL\" -s \"$CHROMSIZE\" -o \"$PREFIX\""
+                [[ "$mode" == "broad" ]] && cmd="$cmd --broad"
+            else
+                echo "  ⚠️ Missing control BAM: $CTRL"
+                continue
+            fi
+        fi
+        
+        # Run GoPeaks
+        eval "$cmd"
+        
+        if [[ $? -eq 0 ]]; then
+            echo "  ✅ Done: ${histone}_${cell}"
+        else
+            echo "  ❌ Failed: ${histone}_${cell}"
+        fi
+    done
+    echo ""
+}
+
+# -------------------------------------------------------------------------------------------
+# HOMER Functions with Cell Type Support
+# -------------------------------------------------------------------------------------------
+run_homer() {
+    local dataset="$1"
+    local histone="$2"
+    local cell_type="$3"
+    local mode="$4"
+    local control="$5"
+    
+    print_header "HOMER | $dataset | $histone | Cell: $cell_type | $mode | $control"
+    
+    # Determine peak style
+    local STYLE="factor"
+    [[ "$mode" == "broad" ]] && STYLE="histone"
+    
+    # Set dataset-specific paths
+    if [[ "$dataset" == "human_pbmc" ]]; then
+        BASE_DIR="${HUMAN_PBMC_DIR}/BAM/celltypeswisebam_50bp"
+    else
+        BASE_DIR="${MOUSE_BRAIN_DIR}/result/celltypeswisebam_50bp"
+    fi
+    
+    # Get cell types
+    IFS=' ' read -r -a CELL_TYPES <<< "$(get_cell_types "$dataset" "$histone" "$cell_type")"
+    
+    # Check if we have valid cell types
+    if [[ ${#CELL_TYPES[@]} -eq 0 ]] || [[ -z "${CELL_TYPES[0]}" ]]; then
+        echo " Error: No valid cell types found for $histone with cell_type=$cell_type"
+        return 1
+    fi
+    
+    # Create output directory
+    local OUT_BASE="${BASE_DIR}/HOMER_peakbed_test"
+    local OUT_DIR="${OUT_BASE}/${histone}_${mode}"
+    if [[ "$control" == "with_input" ]]; then
+        OUT_DIR="${OUT_DIR}/With_input"
+    else
+        OUT_DIR="${OUT_DIR}/Without_input"
+    fi
+    
+    local TAG_BASE="${OUT_DIR}/tag_directories"
+    mkdir -p "$OUT_DIR" "$TAG_BASE"
+    
+    for cell in "${CELL_TYPES[@]}"; do
+        print_step "Processing: $cell (${histone})"
+        
+        local TREATMENT_BAM="${BASE_DIR}/${histone}/${histone}_${cell}.bam"
+        if [[ ! -f "$TREATMENT_BAM" ]]; then
+            echo "  Missing treatment BAM: $TREATMENT_BAM"
+            continue
+        fi
+        
+        local TREATMENT_TAG="${TAG_BASE}/${histone}_${cell}_treatment_tagdir"
+        local PEAK_TXT="${OUT_DIR}/${cell}_${histone}_peaks.txt"
+        local PEAK_BED="${OUT_DIR}/${cell}_${histone}_peaks.bed"
+        
+        # Create tag directory
+        print_step "Creating tag directory..."
+        makeTagDirectory "$TREATMENT_TAG" "$TREATMENT_BAM" 2>/dev/null
+        
+        # Build findPeaks command
+        local cmd="findPeaks \"$TREATMENT_TAG\" -style \"$STYLE\" -o \"$PEAK_TXT\""
+        
+        if [[ "$control" == "with_input" ]]; then
+            local CONTROL_BAM="${BASE_DIR}/${histone}/input_${cell}.bam"
+            local CONTROL_TAG="${TAG_BASE}/${histone}_${cell}_control_tagdir"
+            
+            if [[ -f "$CONTROL_BAM" ]]; then
+                print_step "Creating control tag directory..."
+                makeTagDirectory "$CONTROL_TAG" "$CONTROL_BAM" 2>/dev/null
+                cmd="findPeaks \"$TREATMENT_TAG\" -style \"$STYLE\" -i \"$CONTROL_TAG\" -o \"$PEAK_TXT\""
+            else
+                echo "  ⚠️ Missing control BAM: $CONTROL_BAM"
+                continue
+            fi
+        fi
+        
+        # Run findPeaks
+        print_step "Running HOMER findPeaks..."
+        eval "$cmd" 2>/dev/null
+        
+        # Convert to BED format
+        if [[ -s "$PEAK_TXT" ]]; then
+            print_step "Converting to BED..."
+            awk 'BEGIN{OFS="\t"} NR>1 {print $2, $3, $4, $1, $8, "."}' "$PEAK_TXT" > "$PEAK_BED"
+            echo "  ✅ BED saved: $(basename "$PEAK_BED")"
+        else
+            echo "  ⚠️ No peaks found"
+        fi
+    done
+    echo ""
+}
+
+# -------------------------------------------------------------------------------------------
+# SEACR Functions with Cell Type Support
+# -------------------------------------------------------------------------------------------
+run_seacr() {
+    local dataset="$1"
+    local histone="$2"
+    local cell_type="$3"
+    local mode="$4"
+    local control="$5"
+    
+    print_header "SEACR | $dataset | $histone | Cell: $cell_type | $mode | $control"
+    
+    # Set threshold
+    local THRESHOLD="relaxed"
+    [[ "$mode" == "broad" ]] && THRESHOLD="stringent"
+    
+    # Set dataset-specific paths
+    if [[ "$dataset" == "human_pbmc" ]]; then
+        BASE_DIR="${HUMAN_PBMC_DIR}/BAM/celltypeswisebam_50bp"
+    else
+        BASE_DIR="${MOUSE_BRAIN_DIR}/result/celltypeswisebam_50bp"
+    fi
+    
+    # Get cell types
+    IFS=' ' read -r -a CELL_TYPES <<< "$(get_cell_types "$dataset" "$histone" "$cell_type")"
+    
+    # Check if we have valid cell types
+    if [[ ${#CELL_TYPES[@]} -eq 0 ]] || [[ -z "${CELL_TYPES[0]}" ]]; then
+        echo "❌ Error: No valid cell types found for $histone with cell_type=$cell_type"
+        return 1
+    fi
+    
+    # Create output directory
+    local OUT_BASE="${BASE_DIR}/SEACR_peakbed_test"
+    local OUT_DIR="${OUT_BASE}/${histone}_${mode}"
+    if [[ "$control" == "with_input" ]]; then
+        OUT_DIR="${OUT_DIR}/With_input"
+    else
+        OUT_DIR="${OUT_DIR}/Without_input"
+    fi
+    local TMP_DIR="${OUT_DIR}/bedgraphs"
+    
+    mkdir -p "$OUT_DIR" "$TMP_DIR"
+    
+    for cell in "${CELL_TYPES[@]}"; do
+        print_step "Processing: ${histone}_${cell}"
+        
+        local TREATMENT_BAM="${BASE_DIR}/${histone}/${histone}_${cell}.bam"
+        local TREATMENT_BG="${TMP_DIR}/${histone}_${cell}_treat.bedgraph"
+        local OUTPUT_PREFIX="${OUT_DIR}/${cell}_${histone}"
+        
+        if [[ ! -f "$TREATMENT_BAM" ]]; then
+            echo "  ⚠️ Missing BAM: $TREATMENT_BAM"
+            continue
+        fi
+        
+        # Convert BAM to bedGraph
+        print_step "Converting BAM to bedGraph..."
+        bedtools genomecov -bg -ibam "$TREATMENT_BAM" 2>/dev/null | LC_ALL=C sort -k1,1 -k2,2n > "$TREATMENT_BG"
+        
+        # Build SEACR command
+        local cmd="bash \"$SEACR_SCRIPT\" \"$TREATMENT_BG\" \"0.01\" \"non\" \"$THRESHOLD\" \"$OUTPUT_PREFIX\""
+        
+        if [[ "$control" == "with_input" ]]; then
+            local CONTROL_BAM="${BASE_DIR}/${histone}/input_${cell}.bam"
+            local CONTROL_BG="${TMP_DIR}/${histone}_${cell}_ctrl.bedgraph"
+            
+            if [[ -f "$CONTROL_BAM" ]]; then
+                print_step "Converting control BAM to bedGraph..."
+                bedtools genomecov -bg -ibam "$CONTROL_BAM" 2>/dev/null | LC_ALL=C sort -k1,1 -k2,2n > "$CONTROL_BG"
+                cmd="bash \"$SEACR_SCRIPT\" \"$TREATMENT_BG\" \"$CONTROL_BG\" \"norm\" \"$THRESHOLD\" \"$OUTPUT_PREFIX\""
+            else
+                echo "  ⚠️ Missing control BAM: $CONTROL_BAM"
+                continue
+            fi
+        fi
+        
+        # Run SEACR
+        print_step "Running SEACR..."
+        eval "$cmd" 2>/dev/null
+        
+        if [[ $? -eq 0 ]]; then
+            echo "  ✅ Finished: ${histone}_${cell}"
+        else
+            echo "  ❌ Failed: ${histone}_${cell}"
+        fi
+    done
+    echo ""
+}
+
+# -------------------------------------------------------------------------------------------
+# SICER2 Functions with Cell Type Support
+# -------------------------------------------------------------------------------------------
+run_sicer2() {
+    local dataset="$1"
+    local histone="$2"
+    local cell_type="$3"
+    local mode="$4"
+    local control="$5"
+    
+    print_header "SICER2 | $dataset | $histone | Cell: $cell_type | $mode | $control"
+    
+    # Set parameters
+    local FDR=0.05
+    
+    if [[ "$mode" == "broad" ]]; then
+        WINDOW=100
+        GAP=200
+    else
+        WINDOW=50
+        GAP=100
+    fi
+    
+    # Set dataset-specific paths
+    if [[ "$dataset" == "human_pbmc" ]]; then
+        BASE_DIR="${HUMAN_PBMC_DIR}/BAM/celltypeswisebam_50bp"
+        GENOME="${DATASET_CONFIGS[human_pbmc_genome]}"
+    else
+        BASE_DIR="${MOUSE_BRAIN_DIR}/result/celltypeswisebam_50bp"
+        GENOME="${DATASET_CONFIGS[mouse_brain_genome]}"
+    fi
+    
+    # Get cell types
+    IFS=' ' read -r -a CELL_TYPES <<< "$(get_cell_types "$dataset" "$histone" "$cell_type")"
+    
+    # Check if we have valid cell types
+    if [[ ${#CELL_TYPES[@]} -eq 0 ]] || [[ -z "${CELL_TYPES[0]}" ]]; then
+        echo "❌ Error: No valid cell types found for $histone with cell_type=$cell_type"
+        return 1
+    fi
+    
+    # Create output directory
+    local OUT_BASE="${BASE_DIR}/SICER2_peakbed_test"
+    local OUT_DIR="${OUT_BASE}/${histone}_${mode}"
+    if [[ "$control" == "with_input" ]]; then
+        OUT_DIR="${OUT_DIR}/With_input"
+    else
+        OUT_DIR="${OUT_DIR}/Without_input"
+    fi
+    mkdir -p "$OUT_DIR"
+    
+    for cell in "${CELL_TYPES[@]}"; do
+        print_step "Processing: ${histone}_${cell}"
+        
+        local CELL_OUT="${OUT_DIR}/${histone}_${cell}"
+        mkdir -p "$CELL_OUT"
+        
+        local TREATMENT_BAM="${BASE_DIR}/${histone}/${histone}_${cell}.bam"
+        if [[ ! -f "$TREATMENT_BAM" ]]; then
+            echo "  ⚠️ Missing treatment BAM: $TREATMENT_BAM"
+            continue
+        fi
+        
+        # Build command
+        local cmd="sicer --treatment_file \"$TREATMENT_BAM\" --species \"$GENOME\" --fragment_size 150 --window_size $WINDOW --gap_size $GAP --effective_genome_fraction 0.80 --false_discovery_rate $FDR --redundancy_threshold 1 --output_directory \"$CELL_OUT\" --cpu $THREADS --significant_reads"
+        
+        if [[ "$control" == "with_input" ]]; then
+            local CONTROL_BAM="${BASE_DIR}/${histone}/input_${cell}.bam"
+            if [[ -f "$CONTROL_BAM" ]]; then
+                cmd="sicer --treatment_file \"$TREATMENT_BAM\" --control_file \"$CONTROL_BAM\" --species \"$GENOME\" --fragment_size 150 --window_size $WINDOW --gap_size $GAP --effective_genome_fraction 0.80 --false_discovery_rate $FDR --redundancy_threshold 1 --output_directory \"$CELL_OUT\" --cpu $THREADS --significant_reads"
+            else
+                echo "  ⚠️ Missing control BAM: $CONTROL_BAM"
+                continue
+            fi
+        else
+            cmd="$cmd --e_value 1000"
+        fi
+        
+        # Run SICER2
+        print_step "Running SICER2..."
+        eval "$cmd" > "${CELL_OUT}/sicer.log" 2>&1
+        
+        # Convert .scoreisland to .bed if no control
+        if [[ "$control" == "without_input" ]]; then
+            SCORE_FILE=$(find "$CELL_OUT" -name "*scoreisland" | head -n 1)
+            if [[ -f "$SCORE_FILE" ]]; then
+                print_step "Converting scoreisland to BED..."
+                awk 'BEGIN{OFS="\t"} {print $1, $2, $3, ".", $5, "."}' "$SCORE_FILE" > "${SCORE_FILE%.scoreisland}-FDR${FDR}-island.bed"
+            fi
+        fi
+        
+        if [[ $? -eq 0 ]]; then
+            echo "  ✅ Finished: ${histone}_${cell}"
+        else
+            echo "  ❌ Failed: ${histone}_${cell}"
+        fi
+    done
+    echo ""
+}
+
+# ===========================================================================================
+# MAIN scCTPEAK FUNCTION
+# ===========================================================================================
+# ===========================================================================================
+# MAIN scCTPEAK FUNCTION
+# ===========================================================================================
+scCTPEAK() {
+    local command="$1"
+    shift  # Remove the command from arguments
+    
+    # DEBUG: Print all arguments
+    echo "DEBUG: Command received: scCTPEAK $command $@"
+    
+    # Show welcome message for first run
+    if [[ -z "$SCCTPEAK_FIRST_RUN" ]]; then
+        echo ""
+        echo "╔══════════════════════════════════════════════════════════════════════════════════╗"
+        echo "║                        scCTPEAK v$SCCTPEAK_VERSION                               ║"
+        echo "║          Complete Benchmark Suite for scCUT&Tag Peak-Calling                     ║"
+        echo "╚══════════════════════════════════════════════════════════════════════════════════╝"
+        echo ""
+        export SCCTPEAK_FIRST_RUN=1
+    fi
+    
+    # Validate inputs
+    if [[ -z "$command" ]]; then
+        echo "Usage: scCTPEAK <command> [options]"
+        echo "Use 'scCTPEAK help' for detailed usage"
+        return 1
+    fi
+    
+    case "$command" in
+        "run")
+            # For run command: <dataset> <tool> <histone> <cell_type> <mode> <control>
+            local dataset="$1"
+            local tool="$2"
+            local histone="$3"
+            local cell_type="$4"
+            local mode="$5"
+            local control="$6"
+            
+            echo "DEBUG run: dataset='$dataset' tool='$tool' histone='$histone' cell_type='$cell_type' mode='$mode' control='$control'"
+            
+            # Validate tool
+            case "$tool" in
+                drompa|genrich|gopeaks|macs2|homer|seacr|sicer2)
+                    # Validate dataset
+                    case "$dataset" in
+                        human_pbmc|mouse_brain)
+                            # Validate cell type (can be "all" or specific cell type)
+                            if [[ -z "$cell_type" ]]; then
+                                echo "Error: cell_type is required. Use 'all' for all cell types or specify a cell type"
+                                echo "Example: scCTPEAK run human_pbmc macs2 H3K27ac B broad with_input"
+                                return 1
+                            fi
+                            
+                            # Validate mode
+                            case "$mode" in
+                                broad|narrow)
+                                    # Validate control
+                                    case "$control" in
+                                        with_input|without_input)
+                                            # Call appropriate function
+                                            case "$tool" in
+                                                drompa)
+                                                    run_drompa_peakcalling "$dataset" "$histone" "$cell_type" "$mode" "$control"
+                                                    ;;
+                                                genrich)
+                                                    run_genrich "$dataset" "$histone" "$cell_type" "$mode" "$control"
+                                                    ;;
+                                                gopeaks)
+                                                    run_gopeaks "$dataset" "$histone" "$cell_type" "$mode" "$control"
+                                                    ;;
+                                                macs2)
+                                                    run_macs2 "$dataset" "$histone" "$cell_type" "$mode" "$control"
+                                                    ;;
+                                                homer)
+                                                    run_homer "$dataset" "$histone" "$cell_type" "$mode" "$control"
+                                                    ;;
+                                                seacr)
+                                                    run_seacr "$dataset" "$histone" "$cell_type" "$mode" "$control"
+                                                    ;;
+                                                sicer2)
+                                                    run_sicer2 "$dataset" "$histone" "$cell_type" "$mode" "$control"
+                                                    ;;
+                                            esac
+                                            ;;
+                                        *)
+                                            echo "Error: control must be 'with_input' or 'without_input'"
+                                            return 1
+                                            ;;
+                                    esac
+                                    ;;
+                                *)
+                                    echo "Error: mode must be 'broad' or 'narrow'"
+                                    return 1
+                                    ;;
+                            esac
+                            ;;
+                        *)
+                            echo "Error: dataset must be 'human_pbmc' or 'mouse_brain'"
+                            return 1
+                            ;;
+                    esac
+                    ;;
+                *)
+                    echo "Error: tool must be one of: drompa, genrich, gopeaks, macs2, homer, seacr, sicer2"
+                    return 1
+                    ;;
+            esac
+            ;;
+        
+        "parse2wig")
+            # For parse2wig command: <dataset> <histone> <cell_type>
+            local dataset="$1"
+            local histone="$2"
+            local cell_type="$3"
+            
+            echo "DEBUG parse2wig: dataset='$dataset' histone='$histone' cell_type='$cell_type'"
+            
+            if [[ -z "$dataset" ]] || [[ -z "$histone" ]] || [[ -z "$cell_type" ]]; then
+                echo "Usage: scCTPEAK parse2wig <dataset> <histone> <cell_type>"
+                echo "Example: scCTPEAK parse2wig human_pbmc H3K27ac B"
+                return 1
+            fi
+            run_drompa_parse2wig "$dataset" "$histone" "$cell_type"
+            ;;
+        
+        "batch")
+            # For batch command: <dataset> <tool> <cell_type> <control>
+            local batch_dataset="$1"
+            local batch_tool="$2"
+            local batch_cell_type="$3"
+            local batch_control="$4"
+            
+            echo "DEBUG batch: batch_dataset='$batch_dataset' batch_tool='$batch_tool' batch_cell_type='$batch_cell_type' batch_control='$batch_control'"
+            
+            if [[ -z "$batch_dataset" ]] || [[ -z "$batch_tool" ]] || [[ -z "$batch_cell_type" ]] || [[ -z "$batch_control" ]]; then
+                echo "Usage: scCTPEAK batch <dataset> <tool> <cell_type> <control>"
+                echo "Example: scCTPEAK batch human_pbmc macs2 all with_input"
+                return 1
+            fi
+            
+            print_header "BATCH PROCESSING: $batch_dataset | $batch_tool | Cell: $batch_cell_type | $batch_control"
+            
+            # Get appropriate histone marks for the dataset
+            if [[ "$batch_dataset" == "human_pbmc" ]]; then
+                BROAD_MARKS=(${DATASET_CONFIGS[human_pbmc_broad_marks]})
+                NARROW_MARKS=(${DATASET_CONFIGS[human_pbmc_narrow_marks]})
+            else
+                BROAD_MARKS=(${DATASET_CONFIGS[mouse_brain_broad_marks]})
+                NARROW_MARKS=(${DATASET_CONFIGS[mouse_brain_narrow_marks]})
+            fi
+            
+            # Process broad marks
+            for histone in "${BROAD_MARKS[@]}"; do
+                if [[ "$histone" == "H3K27ac" ]]; then
+                    # H3K27ac needs both broad and narrow
+                    scCTPEAK run "$batch_dataset" "$batch_tool" "$histone" "$batch_cell_type" "broad" "$batch_control"
+                    scCTPEAK run "$batch_dataset" "$batch_tool" "$histone" "$batch_cell_type" "narrow" "$batch_control"
+                else
+                    scCTPEAK run "$batch_dataset" "$batch_tool" "$histone" "$batch_cell_type" "broad" "$batch_control"
+                fi
+            done
+            
+            # Process narrow marks (skip H3K27ac since already processed)
+            for histone in "${NARROW_MARKS[@]}"; do
+                [[ "$histone" == "H3K27ac" ]] && continue
+                scCTPEAK run "$batch_dataset" "$batch_tool" "$histone" "$batch_cell_type" "narrow" "$batch_control"
+            done
+            
+            echo "✅ BATCH PROCESSING COMPLETED!"
+            echo ""
+            ;;
+        
+        "all_tools")
+            # For all_tools command: <dataset> <cell_type> <control>
+            local all_dataset="$1"
+            local all_cell_type="$2"
+            local all_control="$3"
+            
+            echo "DEBUG all_tools: all_dataset='$all_dataset' all_cell_type='$all_cell_type' all_control='$all_control'"
+            
+            if [[ -z "$all_dataset" ]] || [[ -z "$all_cell_type" ]] || [[ -z "$all_control" ]]; then
+                echo "Usage: scCTPEAK all_tools <dataset> <cell_type> <control>"
+                echo "Example: scCTPEAK all_tools human_pbmc B with_input"
+                return 1
+            fi
+            
+            print_header "RUNNING ALL TOOLS: $all_dataset | Cell: $all_cell_type | $all_control"
+            
+            local TOOLS=("drompa" "genrich" "gopeaks" "macs2" "homer" "seacr" "sicer2")
+            
+            for tool in "${TOOLS[@]}"; do
+                echo ""
+                echo "╔══════════════════════════════════════════════════════════════════════════════════╗"
+                echo "║                                TOOL: $tool                                        ║"
+                echo "╚══════════════════════════════════════════════════════════════════════════════════╝"
+                echo ""
+                
+                # First run parse2wig for DROMPAplus if needed
+                if [[ "$tool" == "drompa" ]]; then
+                    if [[ "$all_dataset" == "human_pbmc" ]]; then
+                        HISTONES=(${DATASET_CONFIGS[human_pbmc_broad_marks]} ${DATASET_CONFIGS[human_pbmc_narrow_marks]})
+                    else
+                        HISTONES=(${DATASET_CONFIGS[mouse_brain_broad_marks]} ${DATASET_CONFIGS[mouse_brain_narrow_marks]})
+                    fi
+                    
+                    for histone in "${HISTONES[@]}"; do
+                        echo "Running parse2wig for $histone..."
+                        scCTPEAK parse2wig "$all_dataset" "$histone" "$all_cell_type"
+                    done
+                fi
+                
+                # Run batch processing for this tool
+                scCTPEAK batch "$all_dataset" "$tool" "$all_cell_type" "$all_control"
+            done
+            
+            echo "✅ ALL TOOLS COMPLETED SUCCESSFULLY!"
+            echo ""
+            ;;
+        
+        "help"|"-h"|"--help")
+            echo ""
+            echo "╔══════════════════════════════════════════════════════════════════════════════════╗"
+            echo "║                      scCTPEAK v$SCCTPEAK_VERSION - HELP                          ║"
+            echo "╚══════════════════════════════════════════════════════════════════════════════════╝"
+            echo ""
+            echo "USAGE:"
+            echo "  scCTPEAK <command> [options]"
+            echo ""
+            echo "COMMANDS:"
+            echo "  run <dataset> <tool> <histone> <cell_type> <mode> <control>"
+            echo "      Run specific tool with parameters"
+            echo "      Example: scCTPEAK run human_pbmc macs2 H3K27ac B broad with_input"
+            echo ""
+            echo "  parse2wig <dataset> <histone> <cell_type>"
+            echo "      Run DROMPAplus parse2wig+ preprocessing"
+            echo "      Example: scCTPEAK parse2wig human_pbmc H3K27ac B"
+            echo "               scCTPEAK parse2wig human_pbmc H3K27ac all"
+            echo ""
+            echo "  batch <dataset> <tool> <cell_type> <control>"
+            echo "      Batch process all histone marks for a tool"
+            echo "      Example: scCTPEAK batch human_pbmc macs2 all with_input"
+            echo "               scCTPEAK batch human_pbmc macs2 B with_input"
+            echo ""
+            echo "  all_tools <dataset> <cell_type> <control>"
+            echo "      Run all tools for a dataset"
+            echo "      Example: scCTPEAK all_tools human_pbmc B with_input"
+            echo ""
+            echo "PARAMETERS:"
+            echo "  dataset:    human_pbmc, mouse_brain"
+            echo "  tool:       drompa, genrich, gopeaks, macs2, homer, seacr, sicer2"
+            echo "  histone:    H3K27ac, H3K27me3, H3K4me1, H3K4me2, H3K4me3, H3K9me3, H3K36me3, Olig2, Rad21"
+            echo "  cell_type:  'all' or specific cell type:"
+            echo "              Human PBMC: B, CD4T, CD8T, DC, Mono, NK, otherT, other"
+            echo "              Mouse Brain: Astrocytes, Microglia, mOL, Neurons1, Neurons2, Neurons3, OEC, OPC, VLMC, Unknown"
+            echo "  mode:       broad, narrow"
+            echo "  control:    with_input, without_input"
+            echo ""
+            echo "EXAMPLES:"
+            echo "  1. Run MACS2 on human PBMC H3K27ac in B cells with control:"
+            echo "     scCTPEAK run human_pbmc macs2 H3K27ac B broad with_input"
+            echo ""
+            echo "  2. Preprocess DROMPAplus for all mouse brain cell types:"
+            echo "     scCTPEAK parse2wig mouse_brain H3K27ac all"
+            echo ""
+            echo "  3. Batch process Genrich on all human PBMC cell types:"
+            echo "     scCTPEAK batch human_pbmc genrich all with_input"
+            echo ""
+            echo "  4. Run all tools on mouse brain Astrocytes without control:"
+            echo "     scCTPEAK all_tools mouse_brain Astrocytes without_input"
+            echo ""
+            ;;
+        
+        "version"|"-v"|"--version")
+            echo "scCTPEAK v$SCCTPEAK_VERSION"
+            echo "A Complete Benchmark Suite for scCUT&Tag Peak-Calling"
+            echo "Author: $SCCTPEAK_AUTHOR"
+            ;;
+        
+        *)
+            echo "Error: Unknown command '$command'"
+            echo "Use 'scCTPEAK help' for usage information"
+            return 1
+            ;;
+    esac
+}
+# ===========================================================================================
+# AUTO-COMPLETE FUNCTIONALITY
+# ===========================================================================================
+_scCTPEAK_complete() {
+    local cur prev words cword
+    _init_completion || return
+    
+    case "${cword}" in
+        1)
+            COMPREPLY=($(compgen -W "run parse2wig batch all_tools help version" -- "$cur"))
+            ;;
+        2)
+            case "${words[1]}" in
+                run|batch|all_tools)
+                    COMPREPLY=($(compgen -W "human_pbmc mouse_brain" -- "$cur"))
+                    ;;
+                parse2wig)
+                    COMPREPLY=($(compgen -W "human_pbmc mouse_brain" -- "$cur"))
+                    ;;
+            esac
+            ;;
+        3)
+            case "${words[1]}" in
+                run)
+                    COMPREPLY=($(compgen -W "drompa genrich gopeaks macs2 homer seacr sicer2" -- "$cur"))
+                    ;;
+                batch)
+                    COMPREPLY=($(compgen -W "drompa genrich gopeaks macs2 homer seacr sicer2" -- "$cur"))
+                    ;;
+                parse2wig)
+                    if [[ "${words[2]}" == "human_pbmc" ]]; then
+                        COMPREPLY=($(compgen -W "H3K27ac H3K27me3 H3K4me1 H3K4me2 H3K4me3 H3K9me3" -- "$cur"))
+                    else
+                        COMPREPLY=($(compgen -W "H3K27ac H3K27me3 H3K36me3 H3K4me3 Olig2 Rad21" -- "$cur"))
+                    fi
+                    ;;
+            esac
+            ;;
+        4)
+            case "${words[1]}" in
+                run)
+                    if [[ "${words[2]}" == "human_pbmc" ]]; then
+                        COMPREPLY=($(compgen -W "H3K27ac H3K27me3 H3K4me1 H3K4me2 H3K4me3 H3K9me3" -- "$cur"))
+                    else
+                        COMPREPLY=($(compgen -W "H3K27ac H3K27me3 H3K36me3 H3K4me3 Olig2 Rad21" -- "$cur"))
+                    fi
+                    ;;
+                batch|all_tools)
+                    COMPREPLY=($(compgen -W "all B CD4T CD8T DC Mono NK otherT other Astrocytes Microglia mOL Neurons1 Neurons2 Neurons3 OEC OPC VLMC Unknown" -- "$cur"))
+                    ;;
+            esac
+            ;;
+        5)
+            case "${words[1]}" in
+                run)
+                    COMPREPLY=($(compgen -W "all B CD4T CD8T DC Mono NK otherT other Astrocytes Microglia mOL Neurons1 Neurons2 Neurons3 OEC OPC VLMC Unknown" -- "$cur"))
+                    ;;
+                batch|all_tools)
+                    COMPREPLY=($(compgen -W "broad narrow" -- "$cur"))
+                    ;;
+            esac
+            ;;
+        6)
+            case "${words[1]}" in
+                run)
+                    COMPREPLY=($(compgen -W "broad narrow" -- "$cur"))
+                    ;;
+                batch|all_tools)
+                    COMPREPLY=($(compgen -W "with_input without_input" -- "$cur"))
+                    ;;
+            esac
+            ;;
+        7)
+            case "${words[1]}" in
+                run)
+                    COMPREPLY=($(compgen -W "with_input without_input" -- "$cur"))
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+# Register auto-completion if available
+if declare -F _init_completion >/dev/null 2>&1; then
+    complete -F _scCTPEAK_complete scCTPEAK
+fi
+
+# ===========================================================================================
+# EXPORT THE FUNCTION
+# ===========================================================================================
+export -f scCTPEAK
+
+# ===========================================================================================
+# MAIN EXECUTION (if script is run directly)
+# ===========================================================================================
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # If script is executed directly, run scCTPEAK with provided arguments
+    scCTPEAK "$@"
+fi
+
+
