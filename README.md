@@ -9,6 +9,12 @@
 **scCTPEAK** is a fully reproducible benchmarking framework designed to systematically evaluate seven widely used peak-calling algorithms across two distinct biological systems (Human PBMC and Mouse Brain) and multiple histone modifications of single-cell CUT&Tag (scCUT&Tag) datasets. The framework assesses performance with and without control samples, providing insights into tool robustness for single-cell epigenomics.
 The pipeline benchmarks the following tools:
 
+<img width="11159" height="7096" alt="benchmark_framework" src="https://github.com/user-attachments/assets/788e5f2f-a630-499e-9250-663827fda84a" />
+
+
+<img width="28514" height="12370" alt="benchmark_framework_commandline" src="https://github.com/user-attachments/assets/3bd4e79d-dc27-4583-80a1-e890c2ddda88" />
+
+
 # Key Features
 ## Multi-Tool Evaluation (Seven Tools)
 
