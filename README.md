@@ -16,7 +16,8 @@ The pipeline benchmarks the following tools:
 
 **Command-Line Interface:** 
 
-<img width="1000" height="900" alt="benchmark_framework_commandline" src="https://github.com/user-attachments/assets/47a57ab9-5e4c-404e-abac-11e0c310ef3d" />
+<img width="1200" height="900" alt="benchmark_framework_commandline" src="https://github.com/user-attachments/assets/3e234a38-f542-4cd1-98f2-d67d6dec43b7" />
+
 
 
 ## Using Instruction of *scCTPEAK* 
