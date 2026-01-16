@@ -25,28 +25,13 @@ The pipeline benchmarks the following tools:
 ### Step 1: ***Environment Setup***
 
 First, create a working directory and install required tools in your conda environment:
-
-```bash
-# Create working directory
-mkdir -p peakcalling
-cd peakcalling
+To use scCTPEAK, ensure you have Python 3.9 or higher. Install the required dependencies using:
+````bash
+pip install -r requirements.txt
 
 # Create and activate conda environment
-conda create -n scctpeak python=3.8
+conda create -n scctpeak python=3.9
 conda activate scctpeak
-
-# Install essential tools via conda
-conda install -c bioconda samtools bedtools
-conda install -c bioconda genrich
-conda install -c bioconda homer
-conda install -c bioconda macs2
-
-# Install GoPeaks
-pip install gopeaks
-
-# Note: DROMPAplus, SEACR, and SICER2 require manual installation
-# Follow the specific installation instructions for these tools
-
 ````
 
 
