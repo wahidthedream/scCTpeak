@@ -19,6 +19,167 @@ The pipeline benchmarks the following tools:
 <img width="1000" height="900" alt="benchmark_framework_commandline" src="https://github.com/user-attachments/assets/47a57ab9-5e4c-404e-abac-11e0c310ef3d" />
 
 
+## Using Instruction of *scCTPEAK* 
+
+### Step 1: ***Environment Setup***
+
+First, create a working directory and install required tools in your conda environment:
+
+```bash
+# Create working directory
+mkdir -p peakcalling
+cd peakcalling
+
+# Create and activate conda environment
+conda create -n scctpeak python=3.8
+conda activate scctpeak
+
+# Install essential tools via conda
+conda install -c bioconda samtools bedtools
+conda install -c bioconda genrich
+conda install -c bioconda homer
+conda install -c bioconda macs2
+
+# Install GoPeaks
+pip install gopeaks
+
+# Note: DROMPAplus, SEACR, and SICER2 require manual installation
+# Follow the specific installation instructions for these tools
+
+````
+
+
+### Step 2: ***Run scCTPEAK***
+
+Ensure the scCTPEAK function available in your shell session:
+
+```bash
+
+# Source the scCTPEAK script or add it to your bash profile
+
+source scCTPEAK.sh  # or add to ~/.bashrc
+
+````
+
+### Step 3: ***Explore scCTPEAK Commands***
+
+Use the help command to see all available options:
+
+```bash
+
+scCTPEAK help
+```
+
+### Command Reference
+
+***run - Run specific tool***
+
+Execute a single peak-calling tool with specific parameters.
+
+Syntax:
+
+```bash
+
+scCTPEAK run <dataset> <tool> <histone> <cell_type> <mode> <control>
+```
+
+Example:
+
+````bash
+
+# Run MACS2 for H3K27ac in B cells with broad peak calling using input control
+
+scCTPEAK run human_pbmc macs2 H3K27ac B broad with_input
+
+`````
+
+***parse2wig - DROMPAplus preprocessing***
+
+Required preprocessing step for DROMPAplus before peak calling.
+
+Syntax:
+
+````bash
+scCTPEAK parse2wig <dataset> <histone> <cell_type>
+````
+
+Example:
+
+````bash
+# Preprocess H3K27ac data for B cells
+scCTPEAK parse2wig human_pbmc H3K27ac B
+````
+
+***batch - Batch process all histone marks***
+
+Run all histone marks for a specific tool.
+
+Syntax:
+
+````bash
+
+scCTPEAK batch <dataset> <tool> <cell_type> <control>
+````
+
+Example:
+
+````bash
+
+# Process all histone marks for MACS2 in all cell types with input control
+scCTPEAK batch human_pbmc macs2 all with_input
+
+````
+
+***all_tools - Run complete benchmark***
+Execute all supported tools for comprehensive analysis.
+
+Syntax:
+
+````bash
+scCTPEAK all_tools <dataset> <cell_type> <control>
+````
+
+Example:
+
+````bash
+# Run all tools on human PBMC data for B cells with input control
+scCTPEAK all_tools human_pbmc B with_input
+````
+
+
+***organize - Organize unified outputs***
+Collect all unified BED files into a single directory.
+
+Syntax:
+
+````bash
+
+scCTPEAK organize <dataset> <control>
+````
+Example:
+
+````bash
+# Organize all with_input control files
+scCTPEAK organize human_pbmc with_input
+
+````
+
+
+***summary - Generate summary report***
+Create a comprehensive summary of all unified outputs.
+
+Syntax:
+
+```bash
+scCTPEAK summary <dataset> <control>
+```
+
+Example:
+
+```bash
+# Generate summary for with_input control files
+scCTPEAK summary human_pbmc with_input
+````
 
 # Key Features
 ## Multi-Tool Evaluation (Seven Tools)
