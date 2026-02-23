@@ -79,7 +79,7 @@ Example:
 
 # Run MACS2 for H3K27ac in B cells with broad peak calling using input control
 
-scCTpeak run human_pbmc macs2 H3K27ac B broad with_input
+scCTpeak run human macs2 H3K27ac B broad with_input
 
 `````
 
