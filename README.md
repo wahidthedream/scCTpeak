@@ -97,7 +97,7 @@ Example:
 
 ````bash
 # Preprocess H3K27ac data for B cells
-scCTpeak parse2wig human_pbmc H3K27ac B
+scCTpeak parse2wig human H3K27ac B
 ````
 
 ***batch - Batch process all histone marks***
@@ -116,7 +116,7 @@ Example:
 ````bash
 
 # Process all histone marks for MACS2 in all cell types with input control
-scCTpeak batch human_pbmc macs2 all with_input
+scCTpeak batch human macs2 all with_input
 
 ````
 
@@ -133,7 +133,7 @@ Example:
 
 ````bash
 # Run all tools on human PBMC data for B cells with input control
-scCTpeak all_tools human_pbmc B with_input
+scCTpeak all_tools human B with_input
 ````
 
 
@@ -150,7 +150,7 @@ Example:
 
 ````bash
 # Organize all with_input control files
-scCTpeak organize human_pbmc with_input
+scCTpeak organize human with_input
 
 ````
 
@@ -168,7 +168,7 @@ Example:
 
 ```bash
 # Generate summary for with_input control files
-scCTpeak summary human_pbmc with_input
+scCTpeak summary human with_input
 ````
 
 # Key Features
