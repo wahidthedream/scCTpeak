@@ -11,7 +11,8 @@ The pipeline benchmarks the following tools:
 
 **Framework:**
 
-<img width="1200" height="600" alt="benchmark_framework" src="https://github.com/user-attachments/assets/d45c1263-e661-493a-846e-39d0a5cae43e" />
+<img width="1200" height="600" alt="benchmark_framework" src="https://github.com/user-attachments/assets/43be4513-c97d-4615-b769-0dac4400f4b2" />
+
 
 
 
@@ -19,7 +20,7 @@ The pipeline benchmarks the following tools:
 
 **Command-Line Interface:** 
 
-<img width="1200" height="900" alt="benchmark_framework_commandline" src="https://github.com/user-attachments/assets/3e234a38-f542-4cd1-98f2-d67d6dec43b7" />
+
 
 
 
