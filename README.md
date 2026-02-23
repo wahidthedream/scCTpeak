@@ -4,9 +4,9 @@
 
 
 
-# scCTPEAK: a benchmark suite for scCUT&Tag peak-calling across diverse epigenomic contexts
+# scCTpeak: a benchmark suite for scCUT&Tag peak-calling across diverse epigenomic contexts
 
-**scCTPEAK** is a fully reproducible benchmarking framework designed to systematically evaluate seven widely used peak-calling algorithms across two distinct biological systems (Human PBMC and Mouse Brain) and multiple histone modifications of single-cell CUT&Tag (scCUT&Tag) datasets. The framework assesses performance with and without control samples, providing insights into tool robustness for single-cell epigenomics.
+**scCTpeak** is a fully reproducible benchmarking framework designed to systematically evaluate seven widely used peak-calling algorithms across two distinct biological systems (Human PBMC and Mouse Brain) and multiple histone modifications of single-cell CUT&Tag (scCUT&Tag) datasets. The framework assesses performance with and without control samples, providing insights into tool robustness for single-cell epigenomics.
 The pipeline benchmarks the following tools:
 
 **Framework:**
@@ -21,7 +21,7 @@ The pipeline benchmarks the following tools:
 
 
 
-## Using Instruction of *scCTPEAK* 
+## Using Instruction of *scCTpeak* 
 
 ### Step 1: ***Environment Setup***
 
@@ -36,25 +36,25 @@ conda activate scctpeak
 ````
 
 
-### Step 2: ***Run scCTPEAK***
+### Step 2: ***Run scCTpeak***
 
-Ensure the scCTPEAK function available in your shell session:
+Ensure the scCTpeak function available in your shell session:
 
 ```bash
 
-# Source the scCTPEAK script or add it to your bash profile
+# Source the scCTpeak script or add it to your bash profile
 
-source scCTPEAK.sh  # or add to ~/.bashrc
+source scCTpeak.sh  # or add to ~/.bashrc
 
 ````
 
-### Step 3: ***Explore scCTPEAK Commands***
+### Step 3: ***Explore scCTpeak Commands***
 
 Use the help command to see all available options:
 
 ```bash
 
-scCTPEAK help
+scCTpeak help
 ```
 
 ### Command Reference
@@ -67,7 +67,7 @@ Syntax:
 
 ```bash
 
-scCTPEAK run <dataset> <tool> <histone> <cell_type> <mode> <control>
+scCTpeak run <dataset> <tool> <histone> <cell_type> <mode> <control>
 ```
 
 Example:
@@ -76,7 +76,7 @@ Example:
 
 # Run MACS2 for H3K27ac in B cells with broad peak calling using input control
 
-scCTPEAK run human_pbmc macs2 H3K27ac B broad with_input
+scCTpeak run human_pbmc macs2 H3K27ac B broad with_input
 
 `````
 
@@ -87,14 +87,14 @@ Required preprocessing step for DROMPAplus before peak calling.
 Syntax:
 
 ````bash
-scCTPEAK parse2wig <dataset> <histone> <cell_type>
+scCTpeak parse2wig <dataset> <histone> <cell_type>
 ````
 
 Example:
 
 ````bash
 # Preprocess H3K27ac data for B cells
-scCTPEAK parse2wig human_pbmc H3K27ac B
+scCTpeak parse2wig human_pbmc H3K27ac B
 ````
 
 ***batch - Batch process all histone marks***
@@ -105,7 +105,7 @@ Syntax:
 
 ````bash
 
-scCTPEAK batch <dataset> <tool> <cell_type> <control>
+scCTpeak batch <dataset> <tool> <cell_type> <control>
 ````
 
 Example:
@@ -113,7 +113,7 @@ Example:
 ````bash
 
 # Process all histone marks for MACS2 in all cell types with input control
-scCTPEAK batch human_pbmc macs2 all with_input
+scCTpeak batch human_pbmc macs2 all with_input
 
 ````
 
@@ -123,14 +123,14 @@ Execute all supported tools for comprehensive analysis.
 Syntax:
 
 ````bash
-scCTPEAK all_tools <dataset> <cell_type> <control>
+scCTpeak all_tools <dataset> <cell_type> <control>
 ````
 
 Example:
 
 ````bash
 # Run all tools on human PBMC data for B cells with input control
-scCTPEAK all_tools human_pbmc B with_input
+scCTpeak all_tools human_pbmc B with_input
 ````
 
 
@@ -141,13 +141,13 @@ Syntax:
 
 ````bash
 
-scCTPEAK organize <dataset> <control>
+scCTpeak organize <dataset> <control>
 ````
 Example:
 
 ````bash
 # Organize all with_input control files
-scCTPEAK organize human_pbmc with_input
+scCTpeak organize human_pbmc with_input
 
 ````
 
@@ -158,14 +158,14 @@ Create a comprehensive summary of all unified outputs.
 Syntax:
 
 ```bash
-scCTPEAK summary <dataset> <control>
+scCTpeak summary <dataset> <control>
 ```
 
 Example:
 
 ```bash
 # Generate summary for with_input control files
-scCTPEAK summary human_pbmc with_input
+scCTpeak summary human_pbmc with_input
 ````
 
 # Key Features
@@ -233,6 +233,6 @@ This cross-cell-type input strategies:
 
 ```bash
 # Clone repository
-git clone https://github.com/wahidthedream/scCTPEAK
-cd scCTPEAK
+git clone https://github.com/wahidthedream/scCTpeak
+cd scCTpeak
 
