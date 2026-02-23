@@ -26,13 +26,13 @@ The pipeline benchmarks the following tools:
 ### Step 1: ***Environment Setup***
 
 First, create a working directory and install required tools in your conda environment:
-To use scCTPEAK, ensure you have Python 3.9 or higher. Install the required dependencies using:
+To use scCTpeak, ensure you have Python 3.9 or higher. Install the required dependencies using:
 ````bash
 pip install -r requirements.txt
 
 # Create and activate conda environment
-conda create -n scctpeak python=3.9
-conda activate scctpeak
+conda create -n scCTpeak python=3.9
+conda activate scCTpeak
 ````
 
 
