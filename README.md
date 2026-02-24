@@ -11,7 +11,10 @@ The pipeline benchmarks the following tools:
 
 **Framework:**
 
-<img width="1200" height="600" alt="benchmark_framework" src="https://github.com/user-attachments/assets/43be4513-c97d-4615-b769-0dac4400f4b2" />
+<img width="1200" height="600" alt="benchmark_framework" src="https://github.com/user-attachments/assets/4a4bcda1-75c2-4662-b895-d2cd97cb5297" />
+
+
+
 
 
 
