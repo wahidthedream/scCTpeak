@@ -6,8 +6,10 @@
 
 # Comprehensive multiomics benchmarking of peak-calling methods for scCUT&Tag with scCTpeak
 
-**scCTpeak** is a fully reproducible benchmarking framework designed to systematically evaluate seven widely used peak-calling algorithms across two distinct biological systems (Human PBMC and Mouse Brain) and multiple histone modifications of single-cell CUT&Tag (scCUT&Tag) datasets. The framework assesses performance with and without control samples, providing insights into tool robustness for single-cell epigenomics.
+**scCTpeak** is a fully reproducible benchmarking framework designed to systematically evaluate seven widely used peak-calling tools across two distinct biological systems (Human PBMC and Mouse Brain) and multiple histone modifications of single-cell CUT&Tag (scCUT&Tag) datasets. It integrates an end‑to‑end data processing module that supports two complementary input modes: (i) splitting combined BAM files into cell‑type‑specific BAMs and matching input (control) BAMs using cell barcodes, and (ii) generating cell‑type‑specific BAMs directly from Seurat objects (RDS) and fragment files. The framework assesses performance with and without control samples, providing insights into tool robustness for single-cell epigenomics.
 The pipeline benchmarks the following tools:
+
+
 
 **Framework:**
 
