@@ -64,7 +64,47 @@ Use the help command to see all available options:
 scCTpeak help
 ```
 
-### Command Reference
+### Command Reference for Data Processing
+
+#### Split a combined BAM file into cell‑type BAMs using barcode lists for real data
+
+````bash
+  split_bam <dataset> <histone>
+
+````
+Split a combined BAM file into cell‑type BAMs using barcode lists, then create input (control) BAMs by merging other cell types.
+Example: 
+
+````bash
+scCTpeak split_bam human H3K27ac
+````
+
+Run split_bam for all histones/TFs in the dataset.
+Example: 
+
+````bash
+scCTpeak split_bam_all human
+````
+
+#### Data simulation data processing from RDS:
+
+Process single histone/TF to BAM files
+Examples:
+
+````bash
+scCTpeak process human H3K27ac
+scCTpeak process mouse H3K4me3
+````
+Process all histones/TFs for dataset
+Examples:
+
+````bash
+scCTpeak process_all human
+scCTpeak process_all mouse
+````
+
+
+### Command Reference for Peak Calling
 
 ***run - Run specific tool***
 
