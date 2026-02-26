@@ -1,5 +1,5 @@
 #########################################################################################################
-## Figure 3 A B
+## Figure 3 A, B
 ## Simpson Index / Jaccard Index for all HMs of HumanPBMC (with & without input)
 ## Author: Wahid (modified)
 #########################################################################################################
@@ -476,4 +476,297 @@ run_all_analyses()
 
 
 
+#########################################################################################################
+##
+## Figure 3 C, D
 
+#########################################################################################################
+
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+library(scales)
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+base_dir <- "~/result_jaccard_simpson_additional"
+analysis_type <- "with_input"
+
+histones <- c("H3K27ac-b", "H3K27ac-s", "H3K27me3", "H3K36me3", "H3K4me3", "Olig2", "Rad21")
+methods <- c("DROMPAplus", "Genrich", "GoPeaks", "HOMER", "MACS2", "SEACR", "SICER2")
+
+# Clean color palette
+nature_palette <- c(
+  "#E64B35",  # Red (DROMPAplus)
+  "#4DBBD5",  # Cyan (Genrich)
+  "#00A087",  # Teal (GoPeaks)
+  "#3C5488",  # Blue (HOMER)
+  "#F39B7F",  # Orange (MACS2)
+  "#8491B4",  # Lavender (SEACR)
+  "#91D1C2"   # Mint (SICER2)
+)
+
+names(nature_palette) <- methods
+
+# =============================================================================
+# CLEAN NATURE THEME
+# =============================================================================
+
+theme_nature_clean <- function(base_size = 8) {
+  theme_minimal(base_size = base_size) +
+    theme(
+      text = element_text(family = "sans", color = "black"),
+      plot.title = element_text(hjust = 0.5, face = "bold", size = base_size + 1),
+      axis.title = element_text(face = "plain"),
+      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+      axis.line = element_line(color = "black", linewidth = 0.3),
+      axis.ticks = element_line(color = "black", linewidth = 0.3),
+      panel.grid.major = element_line(color = "gray90", linewidth = 0.2),
+      panel.grid.minor = element_blank(),
+      legend.title = element_text(face = "plain"),
+      legend.key = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      plot.background = element_rect(fill = "white", color = NA),
+      plot.margin = margin(5, 5, 5, 5, "mm")
+    )
+}
+
+# =============================================================================
+# DATA EXTRACTION
+# =============================================================================
+
+extract_simpson_values <- function() {
+  all_data <- data.frame()
+  
+  for (histone in histones) {
+    sim_dir <- file.path(base_dir, paste0(histone, "_Jaccard_and_Simpson_", analysis_type))
+    
+    if (!dir.exists(sim_dir)) next
+    
+    for (method in methods) {
+      simpson_file <- file.path(sim_dir, paste0("Simpson_Matrix_", method, ".csv"))
+      
+      if (file.exists(simpson_file)) {
+        tryCatch({
+          simpson_mat <- read.csv(simpson_file, row.names = 1, check.names = FALSE)
+          
+          if (nrow(simpson_mat) > 1 && ncol(simpson_mat) > 1 && 
+              nrow(simpson_mat) == ncol(simpson_mat)) {
+            
+            n <- nrow(simpson_mat)
+            simpson_values <- numeric()
+            
+            for (i in 1:(n-1)) {
+              for (j in (i+1):n) {
+                val <- as.numeric(simpson_mat[i, j])
+                if (!is.na(val) && is.numeric(val) && val >= 0 && val <= 1) {
+                  simpson_values <- c(simpson_values, val)
+                }
+              }
+            }
+            
+            if (length(simpson_values) > 0) {
+              all_data <- rbind(all_data, data.frame(
+                Histone = histone,
+                Method = method,
+                Simpson_Index = simpson_values,
+                stringsAsFactors = FALSE
+              ))
+            }
+          }
+        }, error = function(e) NULL)
+      }
+    }
+  }
+  
+  if (nrow(all_data) == 0) {
+    stop("No data extracted.")
+  }
+  
+  all_data$Histone <- factor(all_data$Histone, levels = histones)
+  all_data$Method <- factor(all_data$Method, levels = methods)
+  
+  cat("Data extracted:", nrow(all_data), "points\n")
+  return(all_data)
+}
+
+# =============================================================================
+# FIGURE 1: BOX PLOT - CLEAN VERSION 
+# =============================================================================
+
+create_figure1_boxplot <- function(simpson_data) {
+  cat("Creating Figure 1...\n")
+  
+  # Order methods by mean performance
+  method_ranking <- simpson_data %>%
+    group_by(Method) %>%
+    summarise(Mean = mean(Simpson_Index), .groups = "drop") %>%
+    arrange(desc(Mean))
+  
+  method_order <- as.character(method_ranking$Method)
+  simpson_data$Method <- factor(simpson_data$Method, levels = method_order)
+  plot_colors <- nature_palette[method_order]
+  
+  # Create box plot - CLEAN VERSION
+  p <- ggplot(simpson_data, aes(x = Histone, y = Simpson_Index, fill = Method)) +
+    
+    # Box plot with minimal outliers
+    geom_boxplot(
+      position = position_dodge(width = 0.8),
+      width = 0.7,
+      outlier.size = 0.3,      # Very small outliers
+      outlier.shape = 16,      # Simple filled circle
+      outlier.color = "gray50", # Gray color (not white)
+      outlier.alpha = 0.2,     # Very transparent
+      lwd = 0.3,
+      alpha = 0.9
+    ) +
+    
+    # NO stat_summary - removes white balls completely
+    # If you want mean indicators, use a different approach:
+    
+    # OPTION A: Add small black mean lines (recommended)
+    stat_summary(
+      fun = mean,
+      geom = "point",
+      shape = 4,              # X shape instead of circle
+      size = 1.0,
+      color = "black",        # Black color
+      position = position_dodge(width = 0.8),
+      show.legend = FALSE
+    ) +
+    
+    # Color scheme
+    scale_fill_manual(values = plot_colors, name = "Peak caller") +
+    
+    # Y-axis
+    scale_y_continuous(
+      limits = c(0, 1),
+      breaks = seq(0, 1, 0.2),
+      expand = expansion(mult = c(0, 0.05))
+    ) +
+    
+    # Labels
+    labs(
+      x = "Histone modification",
+      y = "Simpson similarity index"
+    ) +
+    
+    # Theme
+    theme_nature_clean() +
+    theme(
+      legend.position = "bottom",
+      legend.direction = "horizontal",
+      legend.box = "horizontal"
+    )
+  
+  return(p)
+}
+
+# =============================================================================
+# ALTERNATIVE: BOX PLOT WITHOUT ANY MEAN POINTS (CLEANEST)
+# =============================================================================
+
+create_figure1_boxplot_clean <- function(simpson_data) {
+  cat("Creating Figure 1 (clean version)...\n")
+  
+  # Order methods by mean performance
+  method_ranking <- simpson_data %>%
+    group_by(Method) %>%
+    summarise(Mean = mean(Simpson_Index), .groups = "drop") %>%
+    arrange(desc(Mean))
+  
+  method_order <- as.character(method_ranking$Method)
+  simpson_data$Method <- factor(simpson_data$Method, levels = method_order)
+  plot_colors <- nature_palette[method_order]
+  
+  # SIMPLEST VERSION - just box plots, no extra points
+  p <- ggplot(simpson_data, aes(x = Histone, y = Simpson_Index, fill = Method)) +
+    
+    # Clean box plots only
+    geom_boxplot(
+      position = position_dodge(width = 0.8),
+      width = 0.7,
+      outlier.size = 0.3,
+      outlier.shape = 16,
+      outlier.color = "black",
+      outlier.alpha = 0.3,
+      lwd = 0.3,
+      alpha = 0.9
+    ) +
+    
+    # Color scheme
+    scale_fill_manual(values = plot_colors, name = "Peak caller") +
+    
+    # Y-axis
+    scale_y_continuous(
+      limits = c(0, 1),
+      breaks = seq(0, 1, 0.2),
+      expand = expansion(mult = c(0, 0.05))
+    ) +
+    
+    # Labels
+    labs(
+      x = "Histone modification",
+      y = "Simpson similarity index"
+    ) +
+    
+    # Theme
+    theme_nature_clean() +
+    theme(
+      legend.position = "bottom",
+      legend.direction = "horizontal"
+    )
+  
+  return(p)
+}
+
+
+# =============================================================================
+# MAIN EXECUTION
+# =============================================================================
+
+run_analysis <- function() {
+  cat("Starting analysis...\n")
+  
+  # Create output directory
+  output_dir <- file.path(base_dir, "figures_final")
+  dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+  
+  # Extract data
+  simpson_data <- extract_simpson_values()
+  
+  # Create figures (use clean version without white balls)
+  fig1 <- create_figure1_boxplot_clean(simpson_data)  # Clean version
+
+
+  # Save figures
+  ggsave(file.path(output_dir, "Figure1_boxplot.pdf"), fig1, 
+         width = 180/25.4, height = 120/25.4, dpi = 300, bg = "white")
+  ggsave(file.path(output_dir, "Figure1_boxplot.png"), fig1,
+         width = 180/25.4, height = 120/25.4, dpi = 300, bg = "white")
+  
+  
+  # Save data
+  write.csv(simpson_data, file.path(output_dir, "simpson_data.csv"), row.names = FALSE)
+  
+  cat("Analysis complete. Files saved in:", output_dir, "\n")
+  return(list(data = simpson_data, fig1 = fig1, fig2 = fig2))
+}
+
+# Run analysis
+results <- tryCatch({
+  run_analysis()
+}, error = function(e) {
+  cat("Error:", e$message, "\n")
+  stop()
+})
+
+cat("Done! No white balls in figures.\n")
+
+# Display the figure
+print(results$fig1)
