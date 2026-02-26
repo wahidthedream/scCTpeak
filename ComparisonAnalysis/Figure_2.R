@@ -460,4 +460,395 @@ print(scatter_plot_width_clean)
 
 ggsave("~/result_frip/Figure/HumanPBMC_SD_vs_Median_Scatter_With_Input.pdf", plot = scatter_plot_width_clean, width = 12, height = 9, device = cairo_pdf, bg = "white")
 
+#########################################################################################################
+## Figure 2 G
+## Functional Analysis of scCUT&Tag (HumanPBMC without) 
+## ChIPseeker assignment of peaks to regulatory elements 
+#########################################################################################################
+# ------ Package Setup ------
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(ggplot2)
+library(ggsci)
+library(tidyverse)
+library(org.Hs.eg.db)
+library(RColorBrewer)
+library(ggpubr)
+
+# ------ Data Preparation ------
+# Define base directory and methods
+base_dir <- "~/HumanPBMC_peakbed"
+methods <- c("DROMPAplus", "Genrich", "GoPeaks", "HOMER", "MACS2",  "SEACR",  "SICER2")
+histone_marks <- c("H3K27ac-b", "H3K27ac-s",  "H3K27me3", "H3K4me1", "H3K4me2", "H3K4me3", "H3K9me3") # Add other marks if needed
+
+# Find all BED files for each method and histone mark
+peak_files <- list()
+for (method in methods) {
+  method_files <- list.files(
+    path = paste0(base_dir, method, "_peakbed"),
+    pattern = paste0(method, "_.*\\.bed$"),
+    full.names = TRUE
+  )
+  
+  # Only keep files for specified histone marks
+  method_files <- method_files[grepl(paste(histone_marks, collapse = "|"), method_files)]
+  
+  if (length(method_files) > 0) {
+    peak_files[[method]] <- method_files
+  }
+}
+
+# Load TxDb (Human hg38)
+#
+txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+
+# ------ Peak Annotation ------
+# Process all files with progress tracking
+peak_anno <- list()
+for (method in names(peak_files)) {
+  message("Processing ", method, " (", length(peak_files[[method]]), " files)")
+  
+  peak_anno[[method]] <- lapply(peak_files[[method]], function(peak_file) {
+    tryCatch({
+      peak <- readPeakFile(peak_file)
+      annotatePeak(peak, 
+                  tssRegion = c(-3000, 3000),
+                  TxDb = txdb,
+                  annoDb = "org.Hs.eg.db")
+    }, error = function(e) {
+      message("Error processing ", basename(peak_file), ": ", e$message)
+      return(NULL)
+    })
+  })
+  
+  # Name each annotation by cell type
+  names(peak_anno[[method]]) <- gsub(paste0("^", method, "_|.bed$"), "", basename(peak_files[[method]]))
+}
+
+# ------ Visualization ------
+# Load required packages (ensure they're loaded)
+library(RColorBrewer)
+library(ggplot2)
+library(ggpubr)
+
+# Create consolidated data frame for plotting
+plot_data <- map_dfr(names(peak_anno), function(method) {
+  map_dfr(names(peak_anno[[method]]), function(sample) {
+    if (!is.null(peak_anno[[method]][[sample]])) {
+      anno <- peak_anno[[method]][[sample]]@annoStat
+      anno$Method <- method
+      anno$Sample <- sample
+      # Extract histone mark from sample name
+      anno$HistoneMark <- str_extract(sample, paste(histone_marks, collapse = "|"))
+      return(anno)
+    }
+  })
+}) %>%
+  mutate(Feature = factor(Feature, 
+                         levels = c("Promoter (<=1kb)", "Promoter (1-2kb)", "Promoter (2-3kb)",
+                                   "5' UTR", "3' UTR", "1st Exon", "Other Exon",
+                                   "1st Intron", "Other Intron", 
+                                   "Downstream (<1kb)", "Distal Intergenic")))
+
+# Create a robust color palette with 11 distinct colors
+feature_colors <- c(
+  "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00",
+  "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5",
+  "#FC8D62"
+)
+names(feature_colors) <- levels(plot_data$Feature)
+
+
+#####################################################################################################
+
+## Merge All figure together on a single page
+#####################################################################################################
+
+# ------ All Methods Parallel Visualization (A4 Page) ------
+# Create a plot with all methods arranged horizontally
+parallel_methods_plot <- ggplot(plot_data, aes(x = Frequency, y = Sample, fill = Feature)) +
+  geom_bar(stat = "identity", position = position_stack(reverse = TRUE), width = 0.7) +
+  scale_fill_manual(values = feature_colors) +
+  labs(x = "Percentage (%)", 
+       y = "",
+       fill = "Genomic Feature") +
+  facet_grid(. ~ Method, scales = "free_x", space = "free_x") +  # Horizontal faceting by method
+  theme_pubr(base_size = 10) +
+  theme(
+    plot.title = element_blank(),  # Removed main title
+    axis.text.x = element_text(size = 8),
+    axis.text.y = element_text(size = 8),
+    legend.position = "top",  # Moved legend to bottom
+    legend.key.size = unit(0.4, "cm"),
+    legend.text = element_text(size = 7),
+    panel.grid.major.x = element_line(color = "grey90", linewidth = 0.2),
+    panel.background = element_rect(fill = "white"),
+    plot.margin = unit(c(0.5,0.5,0.5,0.5), "cm"),  # Reduced margins
+    strip.text.x = element_text(angle = 0, size = 9, face = "bold"),  # Method names as headers
+    strip.background = element_rect(fill = "grey95"),
+    legend.box.margin = margin(t = -10)  # Move legend closer to plot
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.05)))
+
+# Calculate dimensions for A4 page (21.0 x 29.7 cm)
+# Width will be full A4 width (21cm), height adjusted based on content
+n_methods <- length(unique(plot_data$Method))
+plot_width <- 21  # A4 width in cm
+plot_height <- min(29.7, 5 + n_methods * 2)  # Cap at A4 height, adjust as needed
+  
+
+# ------ Save Output ------
+output_dir <- "~/result_regulatory-elements_ChIPseeker/"
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Save the parallel plot on A4 page
+if (FALSE) {  # Change to TRUE if you want a title
+  parallel_methods_plot <- parallel_methods_plot +
+    labs(title = "Peak Feature Distribution Across All Methods") +
+    theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 12))
+}
+
+#  Histone mark version if multiple marks exist
+if (length(unique(plot_data$HistoneMark)) > 1) {
+  histone_facet_plot <- parallel_methods_plot +
+    facet_grid(HistoneMark ~ Method, scales = "free", space = "free") +
+    theme(strip.text.y = element_text(size = 8, face = "bold", angle = 0))
+  
+  ggsave(file.path(output_dir, "Figure_2G.pdf"), 
+         histone_facet_plot, 
+         width = plot_width, 
+         height = min(29.7, plot_height * 1.5),  # Increased height for histone marks
+         units = "cm", 
+         dpi = 300, 
+         limitsize = FALSE)
+}
+
+write_csv(plot_data, file.path(output_dir, "HumanPBMC_all_peak_annotation_stats_without_input.csv"))
+
+
+
+###############################################################################
+#Figure 2 H 
+# COMBINED PROMOTER ANALYSIS FROM SAVED DATA
+# Using MEDIAN with Standard Deviation (Recommended)
+###############################################################################
+
+# Load required packages
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(ggsci)
+
+# Read the saved CSV file
+plot_data <- read_csv("~/result_regulatory-elements_ChIPseeker/HumanPBMC_all_peak_annotation_stats_without_input.csv")
+
+# Define Nature Methods color palette for methods
+all_methods <- unique(plot_data$Method)
+nature_methods_colors <- c(
+  "#E64B35", "#4DBBD5", "#00A087", "#3C5488", "#F39B7F",
+  "#8491B4", "#91D1C2", "#DC0000", "#7E6148", "#B09C85",
+  "#631879", "#9C9EDE", "#637939", "#8C6D31", "#BD9E39"
+)
+method_colors <- setNames(nature_methods_colors[1:length(all_methods)], all_methods)
+
+###############################################################################
+# DATA PROCESSING: Extract and combine promoter categories
+###############################################################################
+
+# Extract and combine all promoter categories
+promoter_data <- plot_data %>%
+  filter(Feature %in% c("Promoter (<=1kb)", "Promoter (1-2kb)", "Promoter (2-3kb)")) %>%
+  mutate(Promoter_Type = Feature,
+         Combined_Promoters = "All Promoters (≤3kb)")
+
+# Calculate total promoter percentage for each sample-method combination
+combined_promoter_summary <- promoter_data %>%
+  group_by(Method, Sample, HistoneMark) %>%
+  summarize(
+    Total_Promoter_Percent = sum(Frequency, na.rm = TRUE),
+    n_promoter_types = n_distinct(Promoter_Type),
+    .groups = 'drop'
+  )
+
+###############################################################################
+#  MEDIAN with STANDARD DEVIATION 
+###############################################################################
+
+# Calculate statistics using Median with SD
+promoter_stats_median <- combined_promoter_summary %>%
+  group_by(Method, HistoneMark) %>%
+  summarize(
+    median_promoter = median(Total_Promoter_Percent, na.rm = TRUE),
+    mean_promoter = mean(Total_Promoter_Percent, na.rm = TRUE),
+    sd_promoter = sd(Total_Promoter_Percent, na.rm = TRUE),
+    n_samples = n(),
+    .groups = 'drop'
+  )
+
+# Create plot with Median and SD
+median_promoter_plot <- ggplot(promoter_stats_median,
+                               aes(x = HistoneMark,
+                                   y = median_promoter,
+                                   color = Method,
+                                   group = Method)) +
+  geom_point(size = 5, position = position_dodge(width = 0.7)) +
+  geom_errorbar(aes(ymin = pmax(median_promoter - sd_promoter, 0),
+                    ymax = pmin(median_promoter + sd_promoter, 100)),
+                width = 0.4,
+                position = position_dodge(width = 0.7),
+                alpha = 0.7,
+                linewidth = 0.8) +
+  scale_color_manual(values = method_colors,
+                     name = "Peak-Calling Method") +
+  scale_y_continuous(
+    labels = scales::percent_format(scale = 1),
+    limits = c(0, 100),
+    breaks = seq(0, 100, by = 20),
+    expand = expansion(mult = c(0.05, 0.1))
+  ) +
+  labs(
+    title = "Median Promoter-Associated Peaks with Standard Deviation",
+    subtitle = "Combined promoter regions within 3kb of TSS",
+    x = "Histone Modification",
+    y = "Median Percentage of Peaks in Promoters (%)",
+    caption = "Error bars represent standard deviation"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray50"),
+    axis.title = element_text(face = "bold", size = 14),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 11, face = "bold"),
+    axis.text.y = element_text(size = 11, face = "bold"),
+    legend.position = "right",
+    legend.title = element_text(face = "bold", size = 12),
+    legend.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    plot.margin = margin(20, 20, 20, 20)
+  )
+
+print(median_promoter_plot)
+
+# Save the plot
+ggsave("~/result_regulatory-elements_ChIPseeker/HumanPBMC_Median_Promoters_with_SD_Without_Input.pdf",
+       plot = median_promoter_plot,
+       width = 16,
+       height = 10,
+       device = "pdf",
+       bg = "white")
+
+
+
+###############################################################################
+# For DISTAL INTERGENIC ANALYSIS FROM SAVED DATA
+# 
+###############################################################################
+
+# Load required packages
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(ggsci)
+
+# Read the saved CSV file
+plot_data <- read_csv("~/result_regulatory-elements_ChIPseeker/HumanPBMC_all_peak_annotation_stats_without_input.csv")
+
+# Define Nature Methods color palette for methods
+all_methods <- unique(plot_data$Method)
+nature_methods_colors <- c(
+  "#E64B35", "#4DBBD5", "#00A087", "#3C5488", "#F39B7F",
+  "#8491B4", "#91D1C2", "#DC0000", "#7E6148", "#B09C85",
+  "#631879", "#9C9EDE", "#637939", "#8C6D31", "#BD9E39"
+)
+method_colors <- setNames(nature_methods_colors[1:length(all_methods)], all_methods)
+
+###############################################################################
+# DATA PROCESSING: Extract Distal Intergenic data
+###############################################################################
+
+# Extract Distal Intergenic data
+intergenic_data <- plot_data %>%
+  filter(Feature == "Distal Intergenic") %>%
+  mutate(Feature_Type = "Distal Intergenic")
+
+# Rename for consistency with analysis
+distal_intergenic_summary <- intergenic_data %>%
+  rename(Distal_Intergenic_Percent = Frequency) %>%
+  select(Method, Sample, HistoneMark, Distal_Intergenic_Percent)
+
+###############################################################################
+#  MEDIAN with STANDARD DEVIATION 
+###############################################################################
+
+# Calculate statistics using Median with SD
+intergenic_stats_median <- distal_intergenic_summary %>%
+  group_by(Method, HistoneMark) %>%
+  summarize(
+    median_intergenic = median(Distal_Intergenic_Percent, na.rm = TRUE),
+    mean_intergenic = mean(Distal_Intergenic_Percent, na.rm = TRUE),
+    sd_intergenic = sd(Distal_Intergenic_Percent, na.rm = TRUE),
+    n_samples = n(),
+    .groups = 'drop'
+  )
+
+# Create plot with Median and SD
+median_intergenic_plot <- ggplot(intergenic_stats_median,
+                                 aes(x = HistoneMark,
+                                     y = median_intergenic,
+                                     color = Method,
+                                     group = Method)) +
+  geom_point(size = 5, position = position_dodge(width = 0.7)) +
+  geom_errorbar(aes(ymin = pmax(median_intergenic - sd_intergenic, 0),
+                    ymax = pmin(median_intergenic + sd_intergenic, 100)),
+                width = 0.4,
+                position = position_dodge(width = 0.7),
+                alpha = 0.7,
+                linewidth = 0.8) +
+  scale_color_manual(values = method_colors,
+                     name = "Peak-Calling Method") +
+  scale_y_continuous(
+    labels = scales::percent_format(scale = 1),
+    limits = c(0, 100),
+    breaks = seq(0, 100, by = 20),
+    expand = expansion(mult = c(0.05, 0.1))
+  ) +
+  labs(
+    title = "Median Distal Intergenic Peaks with Standard Deviation",
+    subtitle = "Analysis of peaks in distal intergenic regions",
+    x = "Histone Modification",
+    y = "Median Percentage of Peaks in Distal Intergenic Regions (%)",
+    caption = "Error bars represent standard deviation"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray50"),
+    axis.title = element_text(face = "bold", size = 14),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 11, face = "bold"),
+    axis.text.y = element_text(size = 11, face = "bold"),
+    legend.position = "right",
+    legend.title = element_text(face = "bold", size = 12),
+    legend.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    plot.margin = margin(20, 20, 20, 20)
+  )
+
+print(median_intergenic_plot)
+
+# Save the plot
+ggsave("~/result_regulatory-elements_ChIPseeker/HumanPBMC_Median_Distal_Intergenic_with_SD_With_Input.pdf",
+       plot = median_intergenic_plot,
+       width = 16,
+       height = 10,
+       device = "pdf",
+       bg = "white")
+
+
 
