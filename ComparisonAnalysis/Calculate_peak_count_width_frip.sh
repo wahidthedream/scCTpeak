@@ -104,7 +104,7 @@ HM=("H3K27ac" "H3K27me3" "H3K4me1" "H3K4me2" "H3K4me3" "H3K9me3")
 Histone=("H3K27ac" "H3K27me3" "H3K4me1" "H3K4me2" "H3K4me3" "H3K9me3")
 Method=("DROMPAplus" "Genrich" "GoPeaks" "HOMER" "MACS2" "SEACR" "SICER2")
 
-BAM_BASE="~/project_scCTpeak"
+BAM_BASE="~/project_scCTpeak/BAM"
 PEAK_BASE="~/project_scCTpeak/HumanPBMC_peakbed"
 
 # Output file
@@ -216,7 +216,7 @@ HM=("H3K27ac" "H3K27me3" "H3K36me3" "H3K4me3" "Olig2" "Rad21")
 Histone=("H3K27ac" "H3K27me3" "H3K36me3" "H3K4me3" "Olig2" "Rad21")
 Method=("DROMPAplus" "Genrich" "GoPeaks" "HOMER" "MACS2" "SEACR" "SICER2")
 
-BAM_BASE="~/project_scCTpeak/"
+BAM_BASE="~/project_scCTpeak/BAM"
 PEAK_BASE="~/project_scCTpeak/MouseBrain_peakbed"
 
 # Output file
