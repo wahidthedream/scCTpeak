@@ -13,7 +13,8 @@ The pipeline benchmarks the following tools:
 
 **Framework:**
 
-<img width="1200" height="500" alt="benchmark_framework" src="https://github.com/user-attachments/assets/9652a027-f050-44ee-acf5-e591a57b6a92" />
+<img width="1200" height="500" alt="benchmark_framework" src="https://github.com/user-attachments/assets/550aa27f-2b4b-432e-9370-fdac1af59f99" />
+
 
 
 **Command-Line Interface:** 
