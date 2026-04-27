@@ -9,7 +9,7 @@
 # ===========================================================================================
 # GLOBAL CONFIGURATION
 # ===========================================================================================
-SCCTPEAK_VERSION="3.1.0"
+SCCTPEAK_VERSION="1.0.0"
 SCCTPEAK_AUTHOR="Wahiduzzaman, M., et al."
 
 # Default paths (UPDATE THESE TO MATCH YOUR SYSTEM)
