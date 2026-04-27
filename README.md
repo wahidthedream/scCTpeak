@@ -275,10 +275,8 @@ This cross-cell-type input strategies:
 - Reduces cell-type-specific bias
 - Improves peak-calling robustness in scCUT&Tag data
 
-## Quick Start
+## Contact information
 
 ```bash
-# Clone repository
-git clone https://github.com/wahidthedream/scCTpeak
-cd scCTpeak
+For technical inquiries, please contact the developer at wahid810@gmail.com
 
