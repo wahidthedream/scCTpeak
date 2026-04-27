@@ -3,7 +3,7 @@
 ### scCTpeak: A Complete Benchmark Suite for scCUT&Tag Peak-Calling
 ### Unified Function for All Tools, Datasets, and Configurations
 ### WITH DATA PROCESSING MODULE & UNIFIED OUTPUT FORMAT
-### Version: 3.1.0
+### Version: 1.0.0
 #############################################################################################
 
 # ===========================================================================================
