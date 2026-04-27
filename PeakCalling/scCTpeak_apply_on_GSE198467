@@ -3,13 +3,13 @@
 ### scCTpeak: A Complete Benchmark Suite for scCUT&Tag Peak-Calling
 ### Unified Function for All Tools, Datasets, and Configurations
 ### WITH DATA PROCESSING MODULE & UNIFIED OUTPUT FORMAT
-### Version: 3.2.0 [GSE198467]
+### Version: 1.0.0 [GSE198467]
 #############################################################################################
 
 # ===========================================================================================
 # GLOBAL CONFIGURATION
 # ===========================================================================================
-SCCTPEAK_VERSION="3.1.0"
+SCCTPEAK_VERSION="1.0.0"
 SCCTPEAK_AUTHOR="Wahiduzzaman, M., et al."
 
 # Default paths (UPDATE THESE TO MATCH YOUR SYSTEM)
