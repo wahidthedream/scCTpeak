@@ -111,6 +111,8 @@ for MARK in "${NARROW_MARKS[@]}"; do
     run_sicer2_all_input "$MARK" "narrow"
 done
 
+
+
 #!/bin/bash
 ###############################################################################################################
 ### SICER2 Peak Calling WITHOUT Control (No Input BAMs)
@@ -220,7 +222,6 @@ done
 for MARK in "${NARROW_MARKS[@]}"; do
   run_sicer2_no_input "$MARK" "narrow"
 done
-
 
 
 #!/bin/bash
@@ -350,7 +351,6 @@ for MARK in "${NARROW_MARKS[@]}"; do
     get_celltypes_for_mark "$MARK"
     run_sicer2_all_input "$MARK" "narrow"
 done
-
 
 
 #!/bin/bash
